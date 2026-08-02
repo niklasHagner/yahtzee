@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Yahtzee</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap');
+
+    body {
+      background: #c8b98a;
+      color: #2a1a08;
+      font-family: 'IM Fell English', Georgia, serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      background-image: radial-gradient(ellipse at 50% 20%, #e8dab0 0%, #c8b98a 70%);
+    }
+
+    #main-layout {
+      display: flex;
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 1100px;
+      align-items: flex-start;
+    }
+
+    h1 {
+      color:#e8dab0;
+      letter-spacing: 2px;
+      font-size: 2.4rem;
+      margin-bottom: 1.5rem;
+      font-weight: 400;
+      font-style: italic;
+    }
+
+    /* ── game table ── */
+    #game-table {
+      flex: 1;
+      min-width: 0;
+      background: #efe5c4;
+      border-radius: 4px;
+      border: 1px solid #5c3d1e55;
+      box-shadow: 0 2px 12px rgba(92,61,30,0.12);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── player rows ── */
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.2rem 1.5rem;
+    }
+    #computer-row { border-bottom: 2px solid #5c3d1e44; background: #e8dab0; }
+    #player-row   { border-top:    2px solid #5c3d1e44; background: #e8dab0; }
+
+    .avatar { width: 56px; height: 56px; flex-shrink: 0; }
+    .avatar svg { width: 100%; height: 100%; }
+
+    .player-info { display: flex; align-items: center; gap: 1.2rem; }
+    .player-labels { display: flex; flex-direction: column; width: 56px; flex-shrink: 0; }
+    .player-name { font-size: 0.65rem; letter-spacing: 3px; color: #8b2020; text-transform: uppercase; }
+    .player-score { font-size: 1.6rem; font-weight: bold; color: #2a1a08; line-height: 1.1; }
+
+    .kept-zone { display: flex; gap: 0.5rem; align-items: center; min-width: 260px; min-height: 60px; }
+
+    /* ── center rolling area ── */
+    #center-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1.5rem;
+      background: #efe5c4;
+    }
+
+    #hud { font-size: 0.82rem; letter-spacing: 0.5px; color: #6b4c2a; min-height: 1.2em; font-style: italic; }
+    #hud span { color: #8b2020; font-weight: bold; font-style: normal; }
+
+    #dice-area {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 1.2rem;
+      min-height: 80px;
+      align-items: center;
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    /* invisible spacer that holds the slot when a die is kept */
+    .die-placeholder { width: 68px; height: 68px; flex-shrink: 0; }
+
+    /* ── dice ── */
+    .die {
+      width: 68px; height: 68px;
+      background: #f5edd8;
+      border-radius: 6px;
+      border: 1.5px solid #5c3d1e;
+      box-shadow: 2px 3px 0 #5c3d1e66, 0 4px 10px rgba(0,0,0,0.25);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+      padding: 8px;
+      gap: 3px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+    .die:hover { transform: translateY(-4px) rotate(-3deg); box-shadow: 3px 6px 0 #5c3d1e88, 0 8px 16px rgba(0,0,0,0.3); }
+
+    @keyframes tumble {
+      0%   { transform: rotate(0deg)   translateY(0);    }
+      20%  { transform: rotate(-18deg) translateY(-6px); }
+      40%  { transform: rotate(14deg)  translateY(-10px); }
+      60%  { transform: rotate(-10deg) translateY(-5px); }
+      80%  { transform: rotate(8deg)   translateY(-2px); }
+      100% { transform: rotate(0deg)   translateY(0);    }
+    }
+    .die.rolling { animation: tumble 0.45s cubic-bezier(0.36,0.07,0.19,0.97); pointer-events: none; }
+
+    .pip {
+      width: 10px; height: 10px;
+      background: #2a1a08;
+      border-radius: 50%;
+      box-shadow: inset 1px 1px 1px rgba(255,255,255,0.15);
+      align-self: center;
+      justify-self: center;
+    }
+    .pip.hidden { visibility: hidden; }
+
+    /* ── roll button ── */
+    #roll-btn {
+      margin-top: 0.5rem;
+      padding: 0.55rem 2.2rem;
+      background: #5c3d1e;
+      border: 2px solid #3d200a;
+      color: #f5edd8;
+      font-family: 'IM Fell English SC', Georgia, serif;
+      font-size: 0.95rem;
+      letter-spacing: 3px;
+      border-radius: 3px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.15s, box-shadow 0.15s;
+      box-shadow: 2px 2px 0 #3d200a;
+    }
+    #roll-btn:hover:not(:disabled) { background: #3d200a; box-shadow: 1px 1px 0 #3d200a; transform: translate(1px,1px); }
+    #roll-btn:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+
+    .die.flying { transition: none !important; }
+
+    /* tilt dice while waiting for a roll */
+    .die.unrolled:nth-child(1) { transform: rotate(-14deg); }
+    .die.unrolled:nth-child(2) { transform: rotate(9deg);  }
+    .die.unrolled:nth-child(3) { transform: rotate(-6deg); }
+    .die.unrolled:nth-child(4) { transform: rotate(12deg); }
+    .die.unrolled:nth-child(5) { transform: rotate(-10deg); }
+
+    .die.locked { pointer-events: none; opacity: 0.45; filter: grayscale(0.3) sepia(0.2); }
+
+    /* score cell states */
+    .score-cell.available { color: #2a6b2a; cursor: pointer; background: #d4e8c4; }
+    .score-cell.available:hover { background: #bfddac; }
+    .score-cell.scratch-available { color: #8b5a1a; cursor: pointer; background: #e8d8a0; }
+    .score-cell.scratch-available:hover { background: #d9c880; }
+    .score-cell.filled   { color: #2a1a08; font-weight: bold; }
+    .score-cell.scratched { color: #b0a080; text-decoration: line-through; }
+
+    /* ── highscore panel ── */
+    #highscore-panel {
+      width: 100%;
+      max-width: 1100px;
+      margin-top: 1.5rem;
+      background: #efe5c4;
+      border-radius: 4px;
+      border: 1px solid #5c3d1e55;
+      box-shadow: 0 2px 12px rgba(92,61,30,0.12);
+      padding: 1rem 1.5rem;
+    }
+    #highscore-panel h2 {
+      font-size: 0.7rem;
+      letter-spacing: 4px;
+      color: #8b2020;
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+      font-family: 'IM Fell English SC', Georgia, serif;
+    }
+    .hs-row {
+      display: grid;
+      grid-template-columns: 1.5rem 1fr 5rem 8rem;
+      font-size: 0.78rem;
+      padding: 0.3rem 0;
+      border-bottom: 1px solid #5c3d1e22;
+      color: #5c3d1e;
+    }
+    .hs-row:last-child { border-bottom: none; }
+    .hs-row.hs-header { color: #b0a080; font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; }
+    .hs-row .hs-score { color: #2a1a08; font-weight: bold; text-align: right; }
+    .hs-row.gold   .hs-score { color: #8b6010; }
+    .hs-row.silver .hs-score { color: #6b6060; }
+    .hs-row.bronze .hs-score { color: #8b4a1a; }
+    .hs-empty { color: #b0a080; font-size: 0.78rem; padding: 0.5rem 0; font-style: italic; }
+
+    /* ── game-over modal ── */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(28,15,6,0.82);
+      z-index: 100; align-items: center; justify-content: center;
+    }
+    #modal-overlay.show { display: flex; }
+
+    /* ── mode select overlay ── */
+    #mode-overlay {
+      position: fixed; inset: 0;
+      background: #c8b98a;
+      background-image: radial-gradient(ellipse at 50% 30%, #e8dab0 0%, #c8b98a 70%);
+      z-index: 200; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1.8rem;
+    }
+    /* decorative inner border frame */
+    #mode-overlay::before {
+      content: '';
+      position: absolute;
+      inset: 24px;
+      border: 2px solid #5c3d1e66;
+      pointer-events: none;
+    }
+    #mode-overlay::after {
+      content: '';
+      position: absolute;
+      inset: 30px;
+      border: 1px solid #5c3d1e33;
+      pointer-events: none;
+    }
+    #mode-logo {
+      font-family: 'IM Fell English SC', Georgia, serif;
+      color: #3d200a;
+      letter-spacing: 10px;
+      font-size: 2.8rem;
+      text-shadow: 2px 2px 0 #c8a87844;
+      margin-bottom: -0.5rem;
+    }
+    #mode-overlay h2 {
+      font-family: 'IM Fell English', Georgia, serif;
+      font-style: italic;
+      font-weight: 400;
+      color: #6b4c2a; letter-spacing: 4px; font-size: 1.1rem;
+    }
+    .mode-cards { display: flex; gap: 1.2rem; flex-wrap: wrap; justify-content: center; }
+    .mode-card {
+      width: 180px; background: #efe5c4;
+      border: 2px solid #5c3d1e; border-radius: 4px;
+      padding: 1.2rem 1rem; text-align: center;
+      box-shadow: 3px 3px 0 #3d200a;
+      cursor: pointer; transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .mode-card:hover:not(.disabled) { transform: translate(-1px,-2px); box-shadow: 4px 5px 0 #3d200a; }
+    .mode-card.disabled { opacity: 0.45; cursor: default; }
+    .mode-card h3 { font-family: 'IM Fell English', Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.1rem; color: #3d200a; letter-spacing: 1px; margin-bottom: 0.4rem; }
+    .mode-card p  { font-size: 0.72rem; color: #6b4c2a; font-style: italic; line-height: 1.4; }
+    #modal-box {
+      background: #efe5c4;
+      border: 2.5px solid #5c3d1e;
+      border-radius: 4px;
+      padding: 2rem; width: 320px; text-align: center;
+      box-shadow: 5px 5px 0 #3d200a;
+    }
+    #modal-box h2 { color: #8b2020; letter-spacing: 4px; margin-bottom: 0.5rem; font-size: 1.3rem; font-family: 'IM Fell English SC', Georgia, serif; }
+    #modal-box .final-score { font-size: 2.5rem; font-weight: bold; color: #2a1a08; margin: 0.5rem 0 1rem; }
+    #modal-box input {
+      width: 100%; padding: 0.5rem 0.75rem;
+      background: #f5edd8; border: 1.5px solid #5c3d1e;
+      color: #2a1a08; font-family: inherit; font-size: 1rem;
+      border-radius: 3px; text-align: center; margin-bottom: 1rem; outline: none;
+    }
+    #modal-box input::placeholder { color: #b0a080; }
+    #modal-save-btn {
+      padding: 0.5rem 2rem;
+      background: #8b2020; border: 2px solid #5c1414; color: #f5edd8;
+      font-family: 'IM Fell English SC', Georgia, serif; font-size: 0.9rem;
+      letter-spacing: 2px; border-radius: 3px; cursor: pointer; text-transform: uppercase;
+      box-shadow: 2px 2px 0 #3d0a0a;
+    }
+    #modal-save-btn:hover { background: #6b1818; }
+
+    /* scorecard column headers */
+    .score-header {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1fr;
+      padding: 0.35rem 0;
+      border-bottom: 1.5px solid #5c3d1e44;
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: #e0d0a0;
+    }
+    .score-header-cell { text-align: center; color: #b0a080; }
+    .score-header-cell.you  { color: #5c1a8b; }
+    .score-header-cell.cpu  { color: #1a5c8b; }
+
+    /* ── turn indicator bar ── */
+    #turn-bar { height: 3px; background: #8b2020; transition: margin 0.4s ease; }
+    #turn-bar.computer-turn { margin-top: 0; margin-bottom: auto; }
+    #turn-bar.player-turn   { margin-top: auto; margin-bottom: 0; }
+
+    /* ── scorecard ── */
+    #scorecard {
+      width: 280px; flex-shrink: 0;
+      background: #efe5c4;
+      border-radius: 4px;
+      border: 1px solid #5c3d1e55;
+      box-shadow: 0 2px 12px rgba(92,61,30,0.12);
+    }
+    #scorecard > :first-child { border-radius: 4px 4px 0 0; overflow: hidden; }
+    #scorecard > :last-child  { border-radius: 0 0 4px 4px; overflow: hidden; }
+
+    .score-section-divider { height: 2px; background: linear-gradient(to right, transparent, #8b202066, transparent); }
+
+    .score-row {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1fr;
+      align-items: center;
+      border-bottom: 1px solid #5c3d1e18;
+    }
+    .score-row:last-child { border-bottom: none; }
+    .score-row.bonus-row { background: #e0d0a0; }
+    .score-row.total-row { background: #d4c090; border-top: 1.5px solid #5c3d1e44; }
+
+    .score-cell {
+      padding: 0.45rem 1rem; text-align: center;
+      font-size: 0.9rem; color: #9a8060; min-width: 60px;
+    }
+    .score-cell.filled   { color: #2a1a08; font-weight: bold; }
+    .score-cell.scratched { color: #c0b090; text-decoration: line-through; }
+
+    .score-label {
+      padding: 0.45rem 0.75rem; font-size: 0.76rem; color: #4a3018;
+      display: flex; align-items: center; gap: 0.4rem; user-select: none;
+    }
+    .score-label.bonus-label  { color: #7a5010; }
+    .score-label.total-label  { color: #8b2020; font-weight: bold; letter-spacing: 1px; font-size: 0.8rem; font-family: 'IM Fell English SC', Georgia, serif; }
+
+    /* info icon + tooltip */
+    .info {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; border-radius: 50%;
+      border: 1px solid #9a8060; color: #9a8060;
+      font-size: 0.6rem; font-style: italic; cursor: default;
+      position: relative; flex-shrink: 0;
+    }
+    .info:hover .tip { display: block; }
+    .tip {
+      display: none;
+      position: fixed;
+      background: #f5edd8;
+      border: 1.5px solid #5c3d1e;
+      color: #2a1a08;
+      font-size: 0.7rem;
+      font-style: italic;
+      padding: 0.4rem 0.6rem;
+      border-radius: 3px;
+      white-space: nowrap;
+      z-index: 1000;
+      pointer-events: none;
+      line-height: 1.5;
+      box-shadow: 2px 2px 0 #5c3d1e44;
+    }
+    .tip::before {
+      content: '';
+      position: absolute;
+      left: -5px; top: 50%;
+      transform: translateY(-50%);
+      border: 5px solid transparent;
+      border-right-color: #5c3d1e;
+      border-left: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Yahtzee</h1>
+
+  <div id="main-layout">
+  <div id="game-table">
+
+    <!-- Computer row -->
+    <div id="turn-bar" class="computer-turn"></div>
+    <div class="player-row" id="computer-row">
+      <div class="avatar">
+        <!-- robot / computer opponent -->
+        <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="18" width="36" height="26" rx="3" fill="#e8dab0" stroke="#5c3d1e" stroke-width="1.5"/>
+          <rect x="18" y="10" width="20" height="10" rx="2" fill="#e8dab0" stroke="#5c3d1e" stroke-width="1.5"/>
+          <line x1="28" y1="18" x2="28" y2="20" stroke="#5c3d1e" stroke-width="1.5"/>
+          <circle cx="20" cy="30" r="4" fill="#f5edd8" stroke="#5c3d1e" stroke-width="1"/>
+          <circle cx="36" cy="30" r="4" fill="#f5edd8" stroke="#5c3d1e" stroke-width="1"/>
+          <circle cx="20" cy="30" r="1.5" fill="#8b2020"/>
+          <circle cx="36" cy="30" r="1.5" fill="#8b2020"/>
+          <rect x="19" y="37" width="18" height="3" rx="1.5" fill="#5c3d1e" opacity="0.5"/>
+          <rect x="6" y="26" width="4" height="10" rx="2" fill="#e8dab0" stroke="#5c3d1e" stroke-width="1"/>
+          <rect x="46" y="26" width="4" height="10" rx="2" fill="#e8dab0" stroke="#5c3d1e" stroke-width="1"/>
+          <circle cx="22" cy="14" r="1.5" fill="#8b2020"/>
+          <circle cx="28" cy="13" r="1.5" fill="#8b2020" opacity="0.5"/>
+          <circle cx="34" cy="14" r="1.5" fill="#8b2020"/>
+        </svg>
+      </div>
+      <div class="player-info">
+        <div class="player-name">Computer</div>
+        <div class="player-score" id="computer-score">0</div>
+      </div>
+      <div class="kept-zone" id="computer-kept"></div>
+    </div>
+
+    <!-- Center rolling area -->
+    <div id="center-area">
+      <div id="hud"><strong>Roll!</strong></div>
+      <div id="dice-area"></div>
+      <button id="roll-btn">Roll</button>
+    </div>
+
+    <!-- Player row -->
+    <div class="player-row" id="player-row">
+      <div class="avatar">
+        <!-- doggo player avatar -->
+        <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- floppy ears hanging from sides of head -->
+          <path d="M14 14 Q6 16 7 30 Q8 38 15 36 Q18 28 18 20Z" fill="#c8a878" stroke="#5c3d1e" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M42 14 Q50 16 49 30 Q48 38 41 36 Q38 28 38 20Z" fill="#c8a878" stroke="#5c3d1e" stroke-width="1.5" stroke-linejoin="round"/>
+          <!-- head -->
+          <circle cx="28" cy="24" r="16" fill="#e8dab0" stroke="#5c3d1e" stroke-width="1.5"/>
+          <!-- snout -->
+          <ellipse cx="28" cy="31" rx="7" ry="5" fill="#f5edd8" stroke="#5c3d1e" stroke-width="1"/>
+          <!-- nose -->
+          <ellipse cx="28" cy="28" rx="3.5" ry="2.5" fill="#5c3d1e"/>
+          <circle cx="26.5" cy="28.5" r="0.8" fill="#e8dab0"/>
+          <circle cx="29.5" cy="28.5" r="0.8" fill="#e8dab0"/>
+          <!-- eyes -->
+          <circle cx="22" cy="22" r="3" fill="#f5edd8" stroke="#5c3d1e" stroke-width="1"/>
+          <circle cx="34" cy="22" r="3" fill="#f5edd8" stroke="#5c3d1e" stroke-width="1"/>
+          <circle cx="22.8" cy="22" r="1.5" fill="#3a2008"/>
+          <circle cx="34.8" cy="22" r="1.5" fill="#3a2008"/>
+          <circle cx="23.3" cy="21.4" r="0.5" fill="#fff"/>
+          <circle cx="35.3" cy="21.4" r="0.5" fill="#fff"/>
+          <!-- tongue -->
+          <path d="M25 35 Q28 39 31 35" stroke="#5c3d1e" stroke-width="1" fill="#e88080"/>
+        </svg>
+      </div>
+      <div class="player-info">
+        <div class="player-labels">
+          <div class="player-name">You</div>
+          <div class="player-score" id="player-score">0</div>
+        </div>
+        <div class="kept-zone" id="player-kept"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scorecard -->
+  <div id="scorecard">
+    <div class="score-header">
+      <div class="score-header-cell cpu">CPU</div>
+      <div class="score-header-cell"></div>
+      <div class="score-header-cell you">You</div>
+    </div>
+
+    <div class="score-section-divider"></div>
+
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-ones">—</div>
+      <div class="score-label">Ones <span class="info">i<span class="tip">Score the sum of all 1s rolled.<br>Aim for 3-of-each to hit the +35 bonus.</span></span></div>
+      <div class="score-cell" id="sc-you-ones">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-twos">—</div>
+      <div class="score-label">Twos</div>
+      <div class="score-cell" id="sc-you-twos">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-threes">—</div>
+      <div class="score-label">Threes</div>
+      <div class="score-cell" id="sc-you-threes">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-fours">—</div>
+      <div class="score-label">Fours</div>
+      <div class="score-cell" id="sc-you-fours">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-fives">—</div>
+      <div class="score-label">Fives</div>
+      <div class="score-cell" id="sc-you-fives">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-sixes">—</div>
+      <div class="score-label">Sixes</div>
+      <div class="score-cell" id="sc-you-sixes">—</div>
+    </div>
+    <div class="score-row bonus-row">
+      <div class="score-cell" id="sc-cpu-upper-bonus">—</div>
+      <div class="score-label bonus-label">Upper Bonus <span id="upper-bonus-progress" style="color:#666;font-size:0.7rem">(0/63)</span> <span class="info">i<span class="tip">Score ≥63 in the upper section to earn +35 bonus.<br>3 of each number totals exactly 63.</span></span></div>
+      <div class="score-cell" id="sc-you-upper-bonus">—</div>
+    </div>
+
+    <div class="score-section-divider"></div>
+
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-3oak">—</div>
+      <div class="score-label">3 of a Kind <span class="info">i<span class="tip">Three or more dice the same.<br>Score: sum of ALL five dice.</span></span></div>
+      <div class="score-cell" id="sc-you-3oak">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-4oak">—</div>
+      <div class="score-label">4 of a Kind <span class="info">i<span class="tip">Four or more dice the same.<br>Score: sum of ALL five dice.</span></span></div>
+      <div class="score-cell" id="sc-you-4oak">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-fh">—</div>
+      <div class="score-label">Full House <span class="info">i<span class="tip">Three of one number + two of another.<br>Always scores exactly 25 points.</span></span></div>
+      <div class="score-cell" id="sc-you-fh">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-ss">—</div>
+      <div class="score-label">Sm. Straight <span class="info">i<span class="tip">Any 4 sequential dice (e.g. 1-2-3-4 or 3-4-5-6).<br>Always scores exactly 30 points.</span></span></div>
+      <div class="score-cell" id="sc-you-ss">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-ls">—</div>
+      <div class="score-label">Lg. Straight <span class="info">i<span class="tip">All 5 dice sequential (1-2-3-4-5 or 2-3-4-5-6).<br>Always scores exactly 40 points.</span></span></div>
+      <div class="score-cell" id="sc-you-ls">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-yahtzee">—</div>
+      <div class="score-label">Yahtzee! <span class="info">i<span class="tip">All five dice the same → 50 points.<br>If Yahtzee is already scored, extra Yahtzees<br>earn +100 each and act as a Joker (see bonus row).</span></span></div>
+      <div class="score-cell" id="sc-you-yahtzee">—</div>
+    </div>
+    <div class="score-row bonus-row">
+      <div class="score-cell" id="sc-cpu-yahtzee-bonus">—</div>
+      <div class="score-label bonus-label">Yahtzee Bonus <span class="info">i<span class="tip">+100 per extra Yahtzee after the first.<br>Joker rule: fill any open lower section category,<br>or the matching upper category if lower is full.<br>You cannot score 0 in Yahtzee to use the joker.</span></span></div>
+      <div class="score-cell" id="sc-you-yahtzee-bonus">—</div>
+    </div>
+    <div class="score-row">
+      <div class="score-cell" id="sc-cpu-chance">—</div>
+      <div class="score-label">Chance <span class="info">i<span class="tip">Any roll is valid. Score: sum of all five dice.<br>Best used as a safety net for unlucky rolls.</span></span></div>
+      <div class="score-cell" id="sc-you-chance">—</div>
+    </div>
+
+    <div class="score-row total-row">
+      <div class="score-cell filled" id="sc-cpu-total">0</div>
+      <div class="score-label total-label">TOTAL</div>
+      <div class="score-cell filled" id="sc-you-total">0</div>
+    </div>
+
+  </div>
+  </div><!-- /main-layout -->
+
+  <!-- Highscore panel -->
+  <div id="highscore-panel" style="display:none">
+    <h2>Highscores</h2>
+    <div class="hs-row hs-header">
+      <span>#</span><span>Name</span><span class="hs-score">Score</span><span style="text-align:right">Date</span>
+    </div>
+    <div id="hs-list"></div>
+  </div>
+
+  <!-- Mode select -->
+  <div id="mode-overlay">
+    <div id="mode-logo">Yahtzee</div>
+    <h2>Choose your game</h2>
+    <div class="mode-cards">
+      <div class="mode-card" id="mode-solo">
+        <h3>Solo</h3>
+        <p>Play alone and chase your best score.</p>
+      </div>
+      <div class="mode-card" id="mode-cpu">
+        <h3>Vs Computer</h3>
+        <p>Face off against a simple opponent.</p>
+      </div>
+      <div class="mode-card" id="mode-multi">
+        <h3>Multiplayer</h3>
+        <p>Challenge a friend online.</p>
+      </div>
+    </div>
+    <!-- name entry + room selection shown when multiplayer is chosen -->
+    <div id="multi-entry" style="display:none; flex-direction:column; align-items:center; gap:0.8rem; margin-top:0.5rem">
+      <input id="multi-name" type="text" maxlength="20" placeholder="Your name"
+        style="width:220px; text-align:center; font-size:1.1rem; letter-spacing:2px; text-transform:uppercase;
+               background:#f5edd8; border:2px solid #5c3d1e; border-radius:3px; padding:0.4rem; color:#2a1a08;
+               font-family:inherit; outline:none">
+      
+      <input id="multi-code" type="text" maxlength="6" placeholder="ROOM CODE"
+        style="width:240px; text-align:center; font-size:1.4rem; letter-spacing:4px; text-transform:uppercase;
+               background:#f5edd8; border:2px solid #5c3d1e; border-radius:3px; padding:0.4rem; color:#2a1a08;
+               font-family:inherit; outline:none">
+      
+      <div style="display:flex; gap:0.8rem; flex-wrap:wrap; justify-content:center">
+        <button id="multi-create-btn"
+          style="padding:0.5rem 1.2rem; background:#5c3d1e; border:2px solid #3d200a; color:#f5edd8;
+                 font-family:inherit; letter-spacing:1px; border-radius:3px; cursor:pointer; text-transform:uppercase;
+                 font-size:0.75rem">
+          Create Room
+        </button>
+        <button id="multi-join-code-btn"
+          style="padding:0.5rem 1.2rem; background:#5c3d1e; border:2px solid #3d200a; color:#f5edd8;
+                 font-family:inherit; letter-spacing:1px; border-radius:3px; cursor:pointer; text-transform:uppercase;
+                 font-size:0.75rem">
+          Join Room
+        </button>
+      </div>
+      
+      <div id="multi-status" style="color:#f5edd8; font-size:0.85rem; font-style:italic; min-height:1.2em"></div>
+    </div>
+
+    <!-- Lobby waiting screen (shown after joining a room) -->
+    <div id="lobby-screen" style="display:none; flex-direction:column; align-items:center; gap:0.9rem; margin-top:0.5rem; width:100%; max-width:360px;
+        background:rgba(42,26,8,0.82); border:1px solid #5c3d1e; border-radius:6px; padding:1.4rem 1.8rem">
+      <div id="lobby-code-display" style="font-size:0.8rem; letter-spacing:3px; color:#c8b98a; text-transform:uppercase; font-weight:bold"></div>
+      <ul id="lobby-player-list" style="list-style:none; padding:0; margin:0; width:100%; display:flex; flex-direction:column; gap:0.5rem; align-items:center"></ul>
+      <div id="lobby-hint" style="color:#c8b98a; font-size:0.82rem; font-style:italic"></div>
+      <button id="start-game-btn"
+        style="display:none; padding:0.6rem 2.2rem; background:#5c3d1e; border:2px solid #3d200a; color:#f5edd8;
+               font-family:inherit; letter-spacing:2px; border-radius:3px; cursor:pointer; text-transform:uppercase; font-size:0.9rem">
+        Start Game
+      </button>
+    </div>
+
+  <!-- Game-over modal -->
+  <div id="modal-overlay">
+    <div id="modal-box">
+      <h2 id="modal-heading">GAME OVER</h2>
+      <div id="modal-results" style="width:100%;margin-bottom:0.6rem"></div>
+      <div class="final-score" id="modal-score">0</div>
+      <input id="modal-name" type="text" maxlength="20" placeholder="Enter your name" />
+      <br>
+      <button id="modal-save-btn">Save Score</button>
+    </div>
+  </div>
+
+  <script>
+    const PIP_LAYOUTS = {
+      1: [[2,2]],
+      2: [[1,1],[3,3]],
+      3: [[1,1],[2,2],[3,3]],
+      4: [[1,1],[1,3],[3,1],[3,3]],
+      5: [[1,1],[1,3],[2,2],[3,1],[3,3]],
+      6: [[1,1],[1,3],[2,1],[2,3],[3,1],[3,3]],
+    };
+
+    const CATS = ['ones','twos','threes','fours','fives','sixes','3oak','4oak','fh','ss','ls','yahtzee','chance'];
+    const UPPER = ['ones','twos','threes','fours','fives','sixes'];
+
+    let gameMode = null; // 'solo' | 'vs-cpu' | 'multiplayer'
+    const cpuScores = Object.fromEntries(CATS.map(c => [c, null]));
+    let cpuYahtzeeBonus = 0;
+
+    const playerScores = Object.fromEntries(CATS.map(c => [c, null]));
+    let playerYahtzeeBonus = 0;
+    let rollsLeft = 3;
+    
+    // Multiplayer state
+    let multiRoomId = null;
+    let multiYourIndex = null;
+    let multiCurrentTurn = 0;
+    let multiPlayers = []; // [{name, scores, yahtzeeBonus}] for all players in game
+    let dice = [];
+
+    // Returns the scorecard cell ID for the current player's category
+    function myCellId(cat) {
+      return gameMode === 'multiplayer' ? `sc-p${multiYourIndex}-${cat}` : `sc-you-${cat}`;
+    }
+
+    const diceArea   = document.getElementById('dice-area');
+    const playerKept = document.getElementById('player-kept');
+
+    // ── dice rendering ──────────────────────────────────────────
+    function makeDie(value) {
+      const die = document.createElement('div');
+      die.className = 'die';
+      die.dataset.value = value;
+      die.dataset.kept = 'false';
+      for (let r = 1; r <= 3; r++)
+        for (let c = 1; c <= 3; c++) {
+          const pip = document.createElement('div');
+          pip.className = 'pip' + (PIP_LAYOUTS[value].some(([pr,pc]) => pr===r && pc===c) ? '' : ' hidden');
+          die.appendChild(pip);
+        }
+      die.dataset.slot = '0'; // assigned at init
+      die.addEventListener('click', () => toggleKeep(die));
+      return die;
+    }
+
+    function updateDiePips(die, value) {
+      die.dataset.value = value;
+      const pips = die.querySelectorAll('.pip');
+      let i = 0;
+      for (let r = 1; r <= 3; r++)
+        for (let c = 1; c <= 3; c++) {
+          pips[i++].className = 'pip' + (PIP_LAYOUTS[value].some(([pr,pc]) => pr===r && pc===c) ? '' : ' hidden');
+        }
+    }
+
+    function toggleKeep(die) {
+      playPickSound();
+      const keeping = die.dataset.kept !== 'true';
+      die.dataset.kept = String(keeping);
+      
+      // Send keep toggle to server in multiplayer mode
+      if (gameMode === 'multiplayer' && multiWs && multiWs.readyState === WebSocket.OPEN) {
+        multiWs.send(JSON.stringify({ type: 'keep_toggle', index: +die.dataset.slot }));
+      }
+      
+      if (keeping) {
+        const ph = document.createElement('div');
+        ph.className = 'die-placeholder';
+        ph.dataset.slot = die.dataset.slot;
+        flipMove(die, () => { diceArea.insertBefore(ph, die); playerKept.appendChild(die); });
+      } else {
+        const ph = diceArea.querySelector(`.die-placeholder[data-slot="${die.dataset.slot}"]`);
+        flipMove(die, () => { diceArea.insertBefore(die, ph || null); ph && ph.remove(); });
+      }
+    }
+
+    function flipMove(el, moveFn) {
+      const first = el.getBoundingClientRect();
+      moveFn();
+      const last = el.getBoundingClientRect();
+      const dx = first.left - last.left, dy = first.top - last.top;
+      el.classList.add('flying');
+      el.style.transform = `translate(${dx}px,${dy}px)`;
+      requestAnimationFrame(() => {
+        el.classList.remove('flying');
+        el.style.transition = 'transform 0.35s cubic-bezier(0.22,1,0.36,1)';
+        el.style.transform = '';
+        el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+      });
+    }
+
+    function tiltDice() {
+      diceArea.querySelectorAll('.die').forEach(d => {
+        d.classList.add('unrolled', 'locked');
+      });
+    }
+
+    [3, 5, 2, 4, 1].forEach((v, i) => {
+      const d = makeDie(v);
+      d.dataset.slot = i;
+      diceArea.appendChild(d);
+    });
+    tiltDice();
+
+    // ── scoring ─────────────────────────────────────────────────
+    function getAllDice() {
+      return [
+        ...[...diceArea.querySelectorAll('.die')].map(d => +d.dataset.value),
+        ...[...playerKept.querySelectorAll('.die')].map(d => +d.dataset.value),
+      ].filter(v => v > 0);
+    }
+
+    function calcScore(cat, dice) {
+      const sum = dice.reduce((a,b) => a+b, 0);
+      const c = Array(7).fill(0);
+      dice.forEach(d => c[d]++);
+      switch (cat) {
+        case 'ones':   return c[1] * 1;
+        case 'twos':   return c[2] * 2;
+        case 'threes': return c[3] * 3;
+        case 'fours':  return c[4] * 4;
+        case 'fives':  return c[5] * 5;
+        case 'sixes':  return c[6] * 6;
+        case '3oak':   return c.some(x=>x>=3) ? sum : 0;
+        case '4oak':   return c.some(x=>x>=4) ? sum : 0;
+        case 'fh':     return (c.some(x=>x===3) && c.some(x=>x===2)) || c.some(x=>x===5) ? 25 : 0;
+        case 'ss': {
+          const u = [...new Set(dice)].sort((a,b)=>a-b).join('');
+          return ['1234','2345','3456'].some(s=>u.includes(s)) ? 30 : 0;
+        }
+        case 'ls': {
+          const u = [...new Set(dice)].sort((a,b)=>a-b).join('');
+          return u==='12345'||u==='23456' ? 40 : 0;
+        }
+        case 'yahtzee': return c.some(x=>x===5) ? 50 : 0;
+        case 'chance':  return sum;
+      }
+      return 0;
+    }
+
+    function showAvailablePicks(dice) {
+      CATS.forEach(cat => {
+        if (playerScores[cat] !== null) return;
+        const cell = document.getElementById(myCellId(cat));
+        if (!cell) return;
+        const score = calcScore(cat, dice);
+        cell.textContent = score;
+        cell.classList.remove('available','scratch-available');
+        cell.classList.add(score > 0 ? 'available' : 'scratch-available');
+        cell.onclick = () => commitScore(cat, score);
+      });
+    }
+
+    function clearAvailablePicks() {
+      CATS.forEach(cat => {
+        if (playerScores[cat] !== null) return;
+        const cell = document.getElementById(myCellId(cat));
+        if (!cell) return;
+        cell.textContent = '—';
+        cell.classList.remove('available','scratch-available');
+        cell.onclick = null;
+      });
+    }
+
+    function renderDice() {
+      if (gameMode === 'multiplayer' && dice.length === 5) {
+        // Map by original slot index so kept dice don't shift other values
+        [...diceArea.querySelectorAll('.die'), ...playerKept.querySelectorAll('.die')].forEach(d => {
+          const slot = +d.dataset.slot;
+          if (slot >= 0 && slot < dice.length) updateDiePips(d, dice[slot]);
+        });
+      } else {
+        const diceElems = [...diceArea.querySelectorAll('.die')];
+        diceElems.forEach((d, i) => updateDiePips(d, dice[i]));
+      }
+    }
+
+    function updatePlayerCell(playerIndex, cat, score) {
+      const cell = document.getElementById(`sc-p${playerIndex}-${cat}`);
+      if (!cell) return;
+      cell.textContent = score;
+      cell.classList.remove('available','scratch-available');
+      cell.classList.add(score === 0 ? 'scratched' : 'filled');
+      cell.onclick = null;
+    }
+
+    function updatePlayerTotal(playerIndex) {
+      const p = multiPlayers[playerIndex];
+      if (!p) return;
+      const base = CATS.reduce((s,c) => s + (p.scores[c] ?? 0), 0);
+      const upperSub = UPPER.reduce((s,c) => s + (p.scores[c] ?? 0), 0);
+      const bonus = UPPER.every(c => p.scores[c] !== null) && upperSub >= 63 ? 35 : 0;
+      const total = base + bonus + p.yahtzeeBonus;
+      const cell = document.getElementById(`sc-p${playerIndex}-total`);
+      if (cell) cell.textContent = total;
+    }
+
+    // Builds a dynamic N-player scorecard (used in multiplayer mode)
+    function buildMultiplayerScorecard(playerNames, myIndex) {
+      const n = playerNames.length;
+      const cols = `2fr ${Array(n).fill('1fr').join(' ')}`;
+      const DEFS = [
+        { cat:'ones',          label:'Ones' },
+        { cat:'twos',          label:'Twos' },
+        { cat:'threes',        label:'Threes' },
+        { cat:'fours',         label:'Fours' },
+        { cat:'fives',         label:'Fives' },
+        { cat:'sixes',         label:'Sixes' },
+        { cat:'upper-bonus',   label:'Upper Bonus', bonus:true },
+        null,
+        { cat:'3oak',          label:'3 of a Kind' },
+        { cat:'4oak',          label:'4 of a Kind' },
+        { cat:'fh',            label:'Full House' },
+        { cat:'ss',            label:'Sm. Straight' },
+        { cat:'ls',            label:'Lg. Straight' },
+        { cat:'yahtzee',       label:'Yahtzee!' },
+        { cat:'yahtzee-bonus', label:'Yahtzee Bonus', bonus:true },
+        { cat:'chance',        label:'Chance' },
+        { cat:'total',         label:'TOTAL', total:true },
+      ];
+      let html = '';
+      // Header row
+      html += `<div class="score-header" style="grid-template-columns:${cols}"><div class="score-header-cell"></div>`;
+      playerNames.forEach((name, i) => {
+        const cls = i === myIndex ? 'you' : 'cpu';
+        const label = i === myIndex ? 'You' : name.split(' ')[0]; // first word only if long
+        html += `<div class="score-header-cell ${cls}" title="${name}">${label}</div>`;
+      });
+      html += `</div><div class="score-section-divider"></div>`;
+      // Score rows
+      DEFS.forEach(def => {
+        if (!def) { html += `<div class="score-section-divider"></div>`; return; }
+        const rowCls = def.bonus ? 'score-row bonus-row' : def.total ? 'score-row total-row' : 'score-row';
+        const labelContent = def.cat === 'upper-bonus'
+          ? `${def.label} <span id="upper-bonus-progress" style="color:#666;font-size:0.7rem">(0/63)</span>`
+          : def.label;
+        html += `<div class="${rowCls}" style="grid-template-columns:${cols}">`;
+        html += `<div class="score-label">${labelContent}</div>`;
+        playerNames.forEach((_, i) => {
+          const val = def.total ? '0' : '—';
+          const cls = def.total ? 'score-cell filled' : 'score-cell';
+          html += `<div class="${cls}" id="sc-p${i}-${def.cat}">${val}</div>`;
+        });
+        html += `</div>`;
+      });
+      document.getElementById('scorecard').innerHTML = html;
+    }
+
+    function updateTurnBar(turn) {
+      if (gameMode !== 'multiplayer') return;
+      const isMyTurn = turn === multiYourIndex;
+      document.getElementById('turn-bar').className = isMyTurn ? 'player-turn' : 'computer-turn';
+      document.getElementById('roll-btn').disabled = !isMyTurn || rollsLeft === 0;
+      if (!isMyTurn) clearAvailablePicks();
+      // Show whoever's turn it is in the opponent row
+      const activeName = multiPlayers[turn] ? multiPlayers[turn].name : '';
+      document.getElementById('computer-row').textContent = isMyTurn ? '' : `${activeName}'s turn`;
+    }
+
+    function refreshScores() {
+      // Update opponent's scorecard from multiOpponentScores
+      CATS.forEach(cat => {
+        if (multiOpponentScores[cat] !== null) {
+          updateOpponentScore(cat, multiOpponentScores[cat]);
+        }
+      });
+    }
+
+    function commitScore(cat, score) {
+      if (gameMode === 'multiplayer' && multiWs && multiWs.readyState === WebSocket.OPEN) {
+        multiWs.send(JSON.stringify({ type: 'score', category: cat, score }));
+        playerScores[cat] = score;
+        if (multiPlayers[multiYourIndex]) multiPlayers[multiYourIndex].scores[cat] = score;
+        const cell = document.getElementById(myCellId(cat));
+        cell.textContent = score;
+        cell.classList.remove('available','scratch-available');
+        cell.classList.add(score === 0 ? 'scratched' : 'filled');
+        cell.onclick = null;
+        clearAvailablePicks();
+        refreshUpperBonus();
+        refreshTotal();
+        return;
+      }
+      
+      playerScores[cat] = score;
+      const cell = document.getElementById(`sc-you-${cat}`);
+      cell.textContent = score;
+      cell.classList.remove('available','scratch-available');
+      cell.classList.add(score === 0 ? 'scratched' : 'filled');
+      cell.onclick = null;
+      clearAvailablePicks();
+
+      // yahtzee bonus
+      if (cat === 'yahtzee' && score === 0) {/* scratched yahtzee — no bonus eligibility */}
+      const isExtraYahtzee = cat !== 'yahtzee' && playerScores['yahtzee'] === 50 && calcScore('yahtzee', getAllDice()) === 50;
+      if (isExtraYahtzee) {
+        playerYahtzeeBonus += 100;
+        const bc = document.getElementById('sc-you-yahtzee-bonus');
+        bc.textContent = playerYahtzeeBonus;
+        bc.classList.add('filled');
+      }
+
+      refreshUpperBonus();
+      refreshTotal();
+
+      if (CATS.every(c => playerScores[c] !== null)) {
+        showGameOver();
+      } else {
+        endPlayerTurn();
+      }
+    }
+
+    function refreshUpperBonus() {
+      const subtotal = UPPER.reduce((s,c) => s + (playerScores[c] ?? 0), 0);
+      const allFilled = UPPER.every(c => playerScores[c] !== null);
+      const cell = document.getElementById(myCellId('upper-bonus'));
+      const prog = document.getElementById('upper-bonus-progress');
+      if (prog) {
+        prog.textContent = `(${subtotal}/63)`;
+        prog.style.color = subtotal >= 63 ? '#3ddc84' : '#666';
+      }
+      if (!cell) return;
+      if (allFilled) {
+        const bonus = subtotal >= 63 ? 35 : 0;
+        cell.textContent = bonus > 0 ? '+35' : '0';
+        cell.classList.add(bonus > 0 ? 'filled' : 'scratched');
+        if (prog) prog.style.display = 'none';
+      } else {
+        cell.textContent = '—';
+      }
+    }
+
+    function refreshTotal() {
+      const base = CATS.reduce((s,c) => s + (playerScores[c] ?? 0), 0);
+      const upperSub = UPPER.reduce((s,c) => s + (playerScores[c] ?? 0), 0);
+      const bonus = upperSub >= 63 ? 35 : 0;
+      const grand = base + bonus + playerYahtzeeBonus;
+      const totalCell = document.getElementById(myCellId('total'));
+      if (totalCell) totalCell.textContent = grand;
+      document.getElementById('player-score').textContent = grand;
+      if (gameMode === 'multiplayer' && multiPlayers[multiYourIndex]) {
+        updatePlayerTotal(multiYourIndex);
+      }
+    }
+
+    // ── turn flow ────────────────────────────────────────────────
+    function endPlayerTurn() {
+      [...playerKept.querySelectorAll('.die')].forEach(d => {
+        d.dataset.kept = 'false';
+        const ph = diceArea.querySelector(`.die-placeholder[data-slot="${d.dataset.slot}"]`);
+        if (ph) { diceArea.insertBefore(d, ph); ph.remove(); }
+        else diceArea.appendChild(d);
+      });
+      rollsLeft = 3;
+      document.getElementById('roll-btn').disabled = false;
+      updateHud();
+      tiltDice();
+      if (gameMode === 'vs-cpu' && CATS.some(c => cpuScores[c] === null)) {
+        setTimeout(runCpuTurn, 500);
+      }
+    }
+
+    // ── HUD ──────────────────────────────────────────────────────
+    function updateHud() {
+      const span = document.getElementById('rolls-left');
+      const hud  = document.getElementById('hud');
+      if (rollsLeft === 3) {
+        hud.innerHTML = '<strong>Roll!</strong>';
+      } else {
+        hud.innerHTML = `Click dice to keep them. You have <span id="rolls-left">${rollsLeft}</span>${rollsLeft === 1 ? ' roll remaining' : ' rolls remaining'}`;
+      }
+    }
+
+    // ── roll ─────────────────────────────────────────────────────
+    function rollFreeDice() {
+      if (rollsLeft <= 0) return;
+      
+      if (gameMode === 'multiplayer' && multiWs && multiWs.readyState === WebSocket.OPEN) {
+        diceArea.querySelectorAll('.die').forEach(d => d.classList.remove('unrolled', 'locked'));
+        playRollSound();
+        multiWs.send(JSON.stringify({ type: 'roll' }));
+        return;
+      }
+      
+      clearAvailablePicks();
+      diceArea.querySelectorAll('.die').forEach(d => d.classList.remove('unrolled', 'locked'));
+      playRollSound();
+
+      const freeDice = [...diceArea.querySelectorAll('.die')];
+      let settled = 0;
+      freeDice.forEach((die, i) => {
+        setTimeout(() => {
+          die.classList.add('rolling');
+          die.addEventListener('animationend', () => {
+            die.classList.remove('rolling');
+            updateDiePips(die, Math.ceil(Math.random() * 6));
+            if (++settled === freeDice.length) {
+              const allDice = getAllDice();
+              if (allDice.length === 5) showAvailablePicks(allDice);
+            }
+          }, { once: true });
+        }, i * 55);
+      });
+
+      rollsLeft--;
+      updateHud();
+      if (rollsLeft === 0) document.getElementById('roll-btn').disabled = true;
+    }
+
+    document.getElementById('roll-btn').addEventListener('click', rollFreeDice);
+
+    // ── highscores ─────────────────────────────────────────────
+    const HS_KEY = 'yahtzee_highscores';
+
+    function loadHighscores() {
+      try { return JSON.parse(localStorage.getItem(HS_KEY)) || []; }
+      catch { return []; }
+    }
+
+    function saveHighscore(name, score) {
+      const list = loadHighscores();
+      list.push({ name: name.trim() || 'Anonymous', score, date: new Date().toLocaleDateString() });
+      list.sort((a,b) => b.score - a.score);
+      localStorage.setItem(HS_KEY, JSON.stringify(list.slice(0, 10)));
+    }
+
+    function renderHighscores() {
+      const list = loadHighscores();
+      const el = document.getElementById('hs-list');
+      if (!list.length) { el.innerHTML = '<div class="hs-empty">No scores yet.</div>'; return; }
+      const medals = ['gold','silver','bronze'];
+      el.innerHTML = list.map((e,i) => `
+        <div class="hs-row ${medals[i]||''}">
+          <span>${i+1}</span>
+          <span>${e.name}</span>
+          <span class="hs-score">${e.score}</span>
+          <span style="text-align:right;color:#555">${e.date}</span>
+        </div>`).join('');
+    }
+
+    function showGameOver(multiTotals, multiNames) {
+      let myScore;
+      if (multiTotals && multiNames) {
+        // Read totals from scorecard cells (includes upper bonus + yahtzee bonus)
+        const totals = multiNames.map((name, i) => {
+          const cell = document.getElementById(`sc-p${i}-total`);
+          return { name, total: cell ? (parseInt(cell.textContent) || 0) : (multiTotals[i] || 0) };
+        });
+        const max = Math.max(...totals.map(t => t.total));
+        const winners = totals.filter(t => t.total === max);
+        document.getElementById('modal-heading').textContent =
+          winners.length === 1 ? `${winners[0].name} WINS!` : 'TIE GAME!';
+        document.getElementById('modal-results').innerHTML = totals
+          .sort((a,b) => b.total - a.total)
+          .map(t => `<div style="display:flex;justify-content:space-between;padding:0.15rem 0.5rem;
+            color:${t.total===max?'#8b2020':'#2a1a08'};font-weight:${t.total===max?'bold':'normal'}">
+            <span>${t.name}${t.total===max?' ★':''}</span><span>${t.total}</span></div>`)
+          .join('');
+        myScore = totals.find(t => t.name === multiNames[multiYourIndex])?.total || 0;
+        document.getElementById('modal-name').value = multiNames[multiYourIndex] || '';
+      } else {
+        document.getElementById('modal-heading').textContent = 'GAME OVER';
+        document.getElementById('modal-results').innerHTML = '';
+        myScore = parseInt(document.getElementById(myCellId('total')).textContent) || 0;
+        document.getElementById('modal-name').value = '';
+      }
+      document.getElementById('modal-score').textContent = myScore;
+      document.getElementById('modal-overlay').classList.add('show');
+      setTimeout(() => document.getElementById('modal-name').focus(), 50);
+    }
+
+    document.getElementById('modal-save-btn').addEventListener('click', () => {
+      const name  = document.getElementById('modal-name').value;
+      const score = parseInt(document.getElementById('modal-score').textContent) || 0;
+      saveHighscore(name, score);
+      renderHighscores();
+      document.getElementById('highscore-panel').style.display = '';
+      document.getElementById('modal-overlay').classList.remove('show');
+    });
+
+    document.getElementById('modal-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('modal-save-btn').click();
+    });
+
+    // ── mode select ───────────────────────────────────────────────
+    function startGame(mode, msg) {
+      gameMode = mode;
+      document.getElementById('mode-overlay').style.display = 'none';
+      document.getElementById('multi-entry').style.display = 'none';
+      
+      if (mode === 'solo') {
+        document.getElementById('computer-row').style.display = 'none';
+        document.getElementById('turn-bar').style.display = 'none';
+        // hide CPU scorecard column
+        document.querySelectorAll('.score-row').forEach(row => {
+          row.style.gridTemplateColumns = '2fr 1fr';
+          const cpuCell = row.querySelector('.score-cell:first-child');
+          if (cpuCell) cpuCell.style.display = 'none';
+        });
+        document.querySelector('.score-header-cell.cpu').style.display = 'none';
+      } else if (mode === 'multiplayer' && msg) {
+        console.log('[multi] game_start', msg);
+        multiRoomId = msg.roomId;
+        multiYourIndex = msg.yourIndex;
+        multiCurrentTurn = msg.turn;
+
+        multiPlayers = msg.players.map(name => ({
+          name,
+          scores: Object.fromEntries(CATS.map(c => [c, null])),
+          yahtzeeBonus: 0,
+        }));
+        Object.keys(playerScores).forEach(k => { playerScores[k] = null; });
+        multiPlayers[multiYourIndex].scores = playerScores;
+
+        buildMultiplayerScorecard(msg.players, multiYourIndex);
+
+        dice = msg.dice;
+        rollsLeft = msg.rollsLeft;
+        renderDice();
+        tiltDice();
+        updateTurnBar(multiCurrentTurn);
+        updateHud();
+
+        document.getElementById('computer-row').style.display = '';
+        document.getElementById('computer-row').textContent = msg.players.filter((_,i) => i !== multiYourIndex).join(', ');
+        document.getElementById('turn-bar').style.display = '';
+        document.getElementById('lobby-screen').style.display = 'none';
+      }
+    }
+
+    document.getElementById('mode-solo').addEventListener('click', () => startGame('solo'));
+    document.getElementById('mode-cpu').addEventListener('click',  () => startGame('vs-cpu'));
+    document.getElementById('mode-multi').addEventListener('click', () => {
+      document.querySelector('.mode-cards').style.display = 'none';
+      document.getElementById('multi-entry').style.display = 'flex';
+      connectMultiplayer();
+    });
+    
+    document.getElementById('multi-create-btn').addEventListener('click', () => {
+      const name = (document.getElementById('multi-name').value || 'ANON').toUpperCase().slice(0,20).trim() || 'ANON';
+      if (multiWs && multiWs.readyState === WebSocket.OPEN) {
+        multiWs.send(JSON.stringify({ type: 'join', name }));
+        document.getElementById('multi-create-btn').disabled = true;
+        setMultiStatus('Creating room…');
+      } else {
+        setMultiStatus('Not connected yet, please wait…');
+      }
+    });
+    
+    document.getElementById('multi-join-code-btn').addEventListener('click', () => {
+      const name = (document.getElementById('multi-name').value || 'ANON').toUpperCase().slice(0,20).trim() || 'ANON';
+      const code = (document.getElementById('multi-code').value || '').toUpperCase();
+      if (!code || code.length < 4) {
+        setMultiStatus('Please enter a valid room code.');
+        return;
+      }
+      if (multiWs && multiWs.readyState === WebSocket.OPEN) {
+        multiWs.send(JSON.stringify({ type: 'join', name, code }));
+        document.getElementById('multi-join-code-btn').disabled = true;
+        setMultiStatus('Joining room…');
+      } else {
+        setMultiStatus('Not connected yet, please wait…');
+      }
+    });
+    
+    document.getElementById('multi-name').addEventListener('input', e => {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z ]/g,'').slice(0,20);
+    });
+    
+    document.getElementById('multi-code').addEventListener('input', e => {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+    });
+
+    const ANIMAL_NAMES = ['BADGER','CAPYBARA','FLAMINGO','HEDGEHOG','IBIS','JAGUAR','KIWI','LEMUR','MARMOT','NARWHAL','OCELOT','PANGOLIN','QUOKKA','RACCOON','SERVAL','TAPIR','UAKARI','VICUNA','WOMBAT','XERUS','YAPOK','ZORILLA','AXOLOTL','BINTURONG','COLUGO','DEGU','FOSSA','GALAGO','HOWLER','IMPALA','JERBOA','KAKAPO','LORIS','MARKHOR','NUMBAT','ONCILLA','POTOO','QUOLL','RINGTAIL','SAOLA','TENREC'];
+    function randomAnimalName() {
+      return ANIMAL_NAMES[Math.floor(Math.random() * ANIMAL_NAMES.length)];
+    }
+    document.getElementById('multi-name').value = randomAnimalName();
+
+    // ── multiplayer WebSocket with reconnect ──────────────────────
+    const WS_URL = 'ws://localhost:3008'; // change to wss://your-deployed-url for production
+    let multiWs = null;
+    let multiReconnectAttempt = 0;
+    const MAX_RECONNECT_ATTEMPTS = 12;
+
+    document.getElementById('start-game-btn').addEventListener('click', () => {
+      if (multiWs && multiWs.readyState === WebSocket.OPEN) {
+        multiWs.send(JSON.stringify({ type: 'start' }));
+        document.getElementById('start-game-btn').disabled = true;
+      }
+    });
+
+    function setMultiStatus(msg) {
+      document.getElementById('multi-status').textContent = msg;
+    }
+
+    function connectMultiplayer() {
+      setMultiStatus(multiReconnectAttempt === 0
+        ? 'Connecting to server…'
+        : `Server may be waking up — retrying (${multiReconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})…`);
+      try { multiWs = new WebSocket(WS_URL); } catch { scheduleReconnect(); return; }
+
+      multiWs.onopen = () => {
+        multiReconnectAttempt = 0;
+        console.log('[ws] connected');
+        setMultiStatus('Connected. Enter your name and join.');
+        // Auto-create room if ?new param is present
+        if (new URLSearchParams(window.location.search).has('new')) {
+          document.getElementById('multi-create-btn').click();
+        }
+      };
+
+      multiWs.onmessage = e => {
+        const msg = JSON.parse(e.data);
+        console.log('[ws] recv', msg);
+
+        if (msg.type === 'room_created') {
+          setMultiStatus(`✓ Room created! Share this URL or code: ${msg.code}`);
+          window.history.pushState({}, '', `?code=${msg.code}`);
+          document.getElementById('multi-code').value = msg.code;
+          document.getElementById('multi-create-btn').disabled = false;
+        }
+
+        if (msg.type === 'player_joined') {
+          multiYourIndex = msg.yourIndex;
+          const code = new URLSearchParams(window.location.search).get('code') || '';
+          document.getElementById('multi-entry').style.display = 'none';
+          document.getElementById('lobby-screen').style.display = 'flex';
+          document.getElementById('lobby-code-display').textContent = `Room: ${code}`;
+
+          const list = document.getElementById('lobby-player-list');
+          list.innerHTML = msg.players.map(p =>
+            `<li style="color:${p.index === msg.yourIndex ? '#f5c542' : '#f5edd8'};font-size:1rem;letter-spacing:1px;text-align:center">
+              <strong>${p.name}</strong>${p.index === 0 ? ' <span style="color:#c8b98a;font-size:0.75rem">(host)</span>' : ''}${p.index === msg.yourIndex ? ' <span style="color:#c8b98a;font-size:0.75rem">(you)</span>' : ''}
+            </li>`
+          ).join('');
+
+          const isHost = msg.yourIndex === 0;
+          const canStart = isHost && msg.players.length >= 2;
+          document.getElementById('start-game-btn').style.display = isHost ? '' : 'none';
+          document.getElementById('start-game-btn').disabled = !canStart;
+          document.getElementById('lobby-hint').textContent = isHost
+            ? (canStart ? 'Ready! Start whenever.' : `Waiting for players… (${msg.players.length}/6)`)
+            : 'Waiting for host to start…';
+        }
+
+        if (msg.type === 'error') {
+          setMultiStatus(`✗ ${msg.message}`);
+          document.getElementById('multi-join-code-btn').disabled = false;
+          document.getElementById('multi-create-btn').disabled = false;
+        }
+
+        if (msg.type === 'game_start') {
+          setMultiStatus('');
+          const code = msg.roomId.replace('room_', '');
+          window.history.pushState({}, '', `?code=${code}`);
+          startGame('multiplayer', msg);
+        }
+
+        if (msg.type === 'dice_rolled') {
+          dice = msg.dice;
+          rollsLeft = msg.rollsLeft;
+          // Unlock dice so they can be kept
+          diceArea.querySelectorAll('.die').forEach(d => d.classList.remove('unrolled', 'locked'));
+          renderDice();
+          updateHud();
+          updateTurnBar(multiCurrentTurn);
+          if (msg.rolledBy === multiYourIndex) showAvailablePicks(dice);
+        }
+
+        if (msg.type === 'score_committed') {
+          if (msg.byIndex !== multiYourIndex && multiPlayers[msg.byIndex]) {
+            multiPlayers[msg.byIndex].scores[msg.category] = msg.score;
+            updatePlayerCell(msg.byIndex, msg.category, msg.score);
+            updatePlayerTotal(msg.byIndex);
+          }
+          [...playerKept.querySelectorAll('.die')].forEach(d => {
+            d.dataset.kept = 'false';
+            const ph = diceArea.querySelector(`.die-placeholder[data-slot="${d.dataset.slot}"]`);
+            if (ph) { diceArea.insertBefore(d, ph); ph.remove(); }
+            else diceArea.appendChild(d);
+          });
+          dice = msg.dice;
+          rollsLeft = msg.rollsLeft;
+          multiCurrentTurn = msg.nextTurn;
+          renderDice();
+          tiltDice();
+          updateTurnBar(multiCurrentTurn);
+          updateHud();
+        }
+
+        if (msg.type === 'game_over') {
+          showGameOver(msg.totals, msg.names);
+        }
+        if (msg.type === 'opponent_disconnected') {
+          setMultiStatus('A player disconnected.');
+        }
+      };
+
+      multiWs.onclose = () => { console.log('[ws] closed'); scheduleReconnect(); };
+      multiWs.onerror = (e) => { console.error('[ws] error', e); multiWs.close(); };
+    }
+
+    function scheduleReconnect() {
+      if (multiReconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+        setMultiStatus('Could not reach server. Please try again later.');
+        return;
+      }
+      multiReconnectAttempt++;
+      const delay = Math.min(1000 * 2 ** (multiReconnectAttempt - 1), 10_000);
+      setMultiStatus(`Server may be waking up — retrying in ${Math.round(delay/1000)}s (${multiReconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})…`);
+      setTimeout(connectMultiplayer, delay);
+    }
+
+    // Check URL for room code or ?new — auto-open multiplayer lobby if present (must be after WS declarations)
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCodeParam = urlParams.get('code');
+    if (roomCodeParam || urlParams.has('new')) {
+      if (roomCodeParam) document.getElementById('multi-code').value = roomCodeParam.toUpperCase();
+      document.querySelector('.mode-cards').style.display = 'none';
+      document.getElementById('multi-entry').style.display = 'flex';
+      connectMultiplayer();
+    }
+
+    renderHighscores();
+
+    // ── CPU AI ────────────────────────────────────────────────────
+    function cpuRollDice(vals) {
+      return vals.map(() => Math.ceil(Math.random() * 6));
+    }
+
+    function cpuPickKeeps(dice) {
+      // keep dice that contribute to the best available category
+      const counts = Array(7).fill(0);
+      dice.forEach(d => counts[d]++);
+      const maxCount = Math.max(...counts);
+      const maxVal = counts.lastIndexOf(maxCount);
+      // keep all dice matching the most frequent value
+      return dice.map(d => d === maxVal);
+    }
+
+    function cpuBestCat(dice) {
+      let best = null, bestScore = -1;
+      CATS.forEach(cat => {
+        if (cpuScores[cat] !== null) return;
+        const s = calcScore(cat, dice);
+        if (s > bestScore) { bestScore = s; best = cat; }
+      });
+      return { cat: best, score: bestScore };
+    }
+
+    function cpuCommitScore(cat, score) {
+      cpuScores[cat] = score;
+      const cell = document.getElementById(`sc-cpu-${cat}`);
+      cell.textContent = score;
+      cell.classList.add(score === 0 ? 'scratched' : 'filled');
+      // upper bonus
+      const sub = UPPER.reduce((s,c) => s + (cpuScores[c] ?? 0), 0);
+      if (UPPER.every(c => cpuScores[c] !== null)) {
+        const bc = document.getElementById('sc-cpu-upper-bonus');
+        bc.textContent = sub >= 63 ? '+35' : '0';
+        bc.classList.add(sub >= 63 ? 'filled' : 'scratched');
+      }
+      const base = CATS.reduce((s,c) => s + (cpuScores[c] ?? 0), 0);
+      const bonus = UPPER.reduce((s,c) => s + (cpuScores[c] ?? 0), 0) >= 63 ? 35 : 0;
+      const total = base + bonus + cpuYahtzeeBonus;
+      document.getElementById('sc-cpu-total').textContent = total;
+      document.getElementById('computer-score').textContent = total;
+    }
+
+    function runCpuTurn() {
+      document.getElementById('roll-btn').disabled = true;
+      diceArea.querySelectorAll('.die').forEach(d => d.style.pointerEvents = 'none');
+      document.getElementById('hud').innerHTML = '<em>Computer is thinking\u2026</em>';
+
+      let dice = [1,2,3,4,5].map(() => Math.ceil(Math.random() * 6));
+      let roll = 0;
+
+      function step() {
+        if (roll >= 3) {
+          const { cat, score } = cpuBestCat(dice);
+          if (cat) cpuCommitScore(cat, score);
+          setTimeout(() => {
+            document.getElementById('hud').innerHTML = '<strong>Roll!</strong>';
+            document.getElementById('roll-btn').disabled = false;
+            diceArea.querySelectorAll('.die').forEach(d => d.style.pointerEvents = '');
+            tiltDice();
+          }, 600);
+          return;
+        }
+        const keeps = roll === 0 ? dice.map(() => false) : cpuPickKeeps(dice);
+        dice = dice.map((d, i) => keeps[i] ? d : Math.ceil(Math.random() * 6));
+        // animate CPU dice briefly
+        [...diceArea.querySelectorAll('.die')].forEach((die, i) => {
+          if (!keeps[i]) {
+            die.classList.add('rolling');
+            die.addEventListener('animationend', () => {
+              die.classList.remove('rolling');
+              updateDiePips(die, dice[i]);
+            }, { once: true });
+          }
+        });
+        roll++;
+        setTimeout(step, 650);
+      }
+      setTimeout(step, 400);
+    }
+    document.querySelectorAll('.info').forEach(icon => {
+      const tip = icon.querySelector('.tip');
+      icon.addEventListener('mouseenter', () => {
+        tip.style.display = 'block';
+        const r  = icon.getBoundingClientRect();
+        const tr = tip.getBoundingClientRect();
+        tip.style.left = (r.left + r.width / 2 - tr.width / 2) + 'px';
+        tip.style.top  = (r.top - tr.height - 8) + 'px';
+        tip.style.transform = '';
+      });
+      icon.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    });
+
+    // ── audio ────────────────────────────────────────────────────
+    const _ac = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playPickSound() {
+      const t = _ac.currentTime;
+      const osc = _ac.createOscillator(), g = _ac.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, t);
+      osc.frequency.exponentialRampToValueAtTime(800, t + 0.06);
+      g.gain.setValueAtTime(0.07, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      osc.connect(g); g.connect(_ac.destination);
+      osc.start(t); osc.stop(t + 0.07);
+    }
+
+    function playRollSound() {
+      const t = _ac.currentTime, sr = _ac.sampleRate;
+      const bufLen = sr * 0.25, buf = _ac.createBuffer(1, bufLen, sr);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++)
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sr * 0.018));
+      const warm = _ac.createBiquadFilter();
+      warm.type = 'bandpass'; warm.frequency.value = 340; warm.Q.value = 1.1;
+      const master = _ac.createGain();
+      master.gain.setValueAtTime(0, t);
+      master.gain.linearRampToValueAtTime(0.28, t + 0.01);
+      master.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+      master.connect(_ac.destination);
+      [0, 0.07, 0.15].forEach(off => {
+        const s = _ac.createBufferSource(), g = _ac.createGain();
+        s.buffer = buf;
+        g.gain.setValueAtTime(1 - off * 1.8, t + off);
+        s.connect(warm); warm.connect(g); g.connect(master);
+        s.start(t + off); s.stop(t + off + 0.18);
+      });
+    }
+  </script>
+</body>
+</html>
+
