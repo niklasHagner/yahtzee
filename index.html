@@ -6,7 +6,7 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@1,700&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap');
 
     body {
       background: #c8b98a;
@@ -28,13 +28,15 @@
       align-items: flex-start;
     }
 
-    h1 {
-      color:#e8dab0;
-      letter-spacing: 2px;
-      font-size: 2.4rem;
-      margin-bottom: 1.5rem;
-      font-weight: 400;
+    h1, #mode-logo {
+      font-family: 'EB Garamond', Georgia, serif;
+      color: #3d200a;
+      letter-spacing: 3px;
+      font-size: 2.6rem;
+      font-weight: 700;
       font-style: italic;
+      text-shadow: 1px 2px 0 #c8a87866;
+      margin-bottom: 1.5rem;
     }
 
     /* ── game table ── */
@@ -86,7 +88,7 @@
 
     #dice-area {
       display: flex;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       gap: 1.2rem;
       min-height: 80px;
       align-items: center;
@@ -95,11 +97,12 @@
     }
 
     /* invisible spacer that holds the slot when a die is kept */
-    .die-placeholder { width: 68px; height: 68px; flex-shrink: 0; }
+    .die-placeholder { width: clamp(44px, 9vw, 68px); aspect-ratio: 1; flex-shrink: 0; }
 
     /* ── dice ── */
     .die {
-      width: 68px; height: 68px;
+      width: clamp(44px, 9vw, 68px);
+      aspect-ratio: 1;
       background: #f5edd8;
       border-radius: 6px;
       border: 1.5px solid #5c3d1e;
@@ -107,8 +110,8 @@
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       grid-template-rows: 1fr 1fr 1fr;
-      padding: 8px;
-      gap: 3px;
+      padding: clamp(4px, 1vw, 8px);
+      gap: 2px;
       cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
       position: relative;
@@ -126,14 +129,14 @@
     .die.rolling { animation: tumble 0.45s cubic-bezier(0.36,0.07,0.19,0.97); pointer-events: none; }
 
     .pip {
-      width: 10px; height: 10px;
+      width: clamp(6px, 1.4vw, 10px); height: clamp(6px, 1.4vw, 10px);
       background: #2a1a08;
       border-radius: 50%;
       box-shadow: inset 1px 1px 1px rgba(255,255,255,0.15);
       align-self: center;
       justify-self: center;
     }
-    .pip.hidden { visibility: hidden; }
+    .pip.pip-off { visibility: hidden; }
 
     /* ── roll button ── */
     #roll-btn {
@@ -173,48 +176,24 @@
     .score-cell.filled   { color: #2a1a08; font-weight: bold; }
     .score-cell.scratched { color: #b0a080; text-decoration: line-through; }
 
-    /* ── highscore panel ── */
-    #highscore-panel {
-      width: 100%;
-      max-width: 1100px;
-      margin-top: 1.5rem;
-      background: #efe5c4;
-      border-radius: 4px;
-      border: 1px solid #5c3d1e55;
-      box-shadow: 0 2px 12px rgba(92,61,30,0.12);
-      padding: 1rem 1.5rem;
-    }
-    #highscore-panel h2 {
-      font-size: 0.7rem;
-      letter-spacing: 4px;
-      color: #8b2020;
-      text-transform: uppercase;
-      margin-bottom: 0.75rem;
-      font-family: 'IM Fell English SC', Georgia, serif;
-    }
-    .hs-row {
-      display: grid;
-      grid-template-columns: 1.5rem 1fr 5rem 8rem;
-      font-size: 0.78rem;
-      padding: 0.3rem 0;
-      border-bottom: 1px solid #5c3d1e22;
-      color: #5c3d1e;
-    }
-    .hs-row:last-child { border-bottom: none; }
-    .hs-row.hs-header { color: #b0a080; font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; }
-    .hs-row .hs-score { color: #2a1a08; font-weight: bold; text-align: right; }
-    .hs-row.gold   .hs-score { color: #8b6010; }
-    .hs-row.silver .hs-score { color: #6b6060; }
-    .hs-row.bronze .hs-score { color: #8b4a1a; }
-    .hs-empty { color: #b0a080; font-size: 0.78rem; padding: 0.5rem 0; font-style: italic; }
+    .hidden { display: none !important; }
 
     /* ── game-over modal ── */
     #modal-overlay {
-      display: none; position: fixed; inset: 0;
+      display: flex; position: fixed; inset: 0;
       background: rgba(28,15,6,0.82);
       z-index: 100; align-items: center; justify-content: center;
     }
-    #modal-overlay.show { display: flex; }
+    #multi-entry {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.8rem; margin-top: 0.5rem;
+    }
+    #lobby-screen {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.9rem; margin-top: 0.5rem; width: 100%; max-width: 360px;
+      background: rgba(42,26,8,0.82); border: 1px solid #5c3d1e;
+      border-radius: 6px; padding: 1.4rem 1.8rem;
+    }
 
     /* ── mode select overlay ── */
     #mode-overlay {
@@ -240,11 +219,7 @@
       pointer-events: none;
     }
     #mode-logo {
-      font-family: 'IM Fell English SC', Georgia, serif;
-      color: #3d200a;
-      letter-spacing: 10px;
       font-size: 2.8rem;
-      text-shadow: 2px 2px 0 #c8a87844;
       margin-bottom: -0.5rem;
     }
     #mode-overlay h2 {
@@ -560,15 +535,6 @@
   </div>
   </div><!-- /main-layout -->
 
-  <!-- Highscore panel -->
-  <div id="highscore-panel" style="display:none">
-    <h2>Highscores</h2>
-    <div class="hs-row hs-header">
-      <span>#</span><span>Name</span><span class="hs-score">Score</span><span style="text-align:right">Date</span>
-    </div>
-    <div id="hs-list"></div>
-  </div>
-
   <!-- Mode select -->
   <div id="mode-overlay">
     <div id="mode-logo">Yahtzee</div>
@@ -588,7 +554,7 @@
       </div>
     </div>
     <!-- name entry + room selection shown when multiplayer is chosen -->
-    <div id="multi-entry" style="display:none; flex-direction:column; align-items:center; gap:0.8rem; margin-top:0.5rem">
+    <div id="multi-entry" class="hidden">
       <input id="multi-name" type="text" maxlength="20" placeholder="Your name"
         style="width:220px; text-align:center; font-size:1.1rem; letter-spacing:2px; text-transform:uppercase;
                background:#f5edd8; border:2px solid #5c3d1e; border-radius:3px; padding:0.4rem; color:#2a1a08;
@@ -618,27 +584,26 @@
     </div>
 
     <!-- Lobby waiting screen (shown after joining a room) -->
-    <div id="lobby-screen" style="display:none; flex-direction:column; align-items:center; gap:0.9rem; margin-top:0.5rem; width:100%; max-width:360px;
-        background:rgba(42,26,8,0.82); border:1px solid #5c3d1e; border-radius:6px; padding:1.4rem 1.8rem">
+    <div id="lobby-screen" class="hidden">
       <div id="lobby-code-display" style="font-size:0.8rem; letter-spacing:3px; color:#c8b98a; text-transform:uppercase; font-weight:bold"></div>
       <ul id="lobby-player-list" style="list-style:none; padding:0; margin:0; width:100%; display:flex; flex-direction:column; gap:0.5rem; align-items:center"></ul>
       <div id="lobby-hint" style="color:#c8b98a; font-size:0.82rem; font-style:italic"></div>
-      <button id="start-game-btn"
-        style="display:none; padding:0.6rem 2.2rem; background:#5c3d1e; border:2px solid #3d200a; color:#f5edd8;
+      <button id="start-game-btn" class="hidden"
+        style="padding:0.6rem 2.2rem; background:#5c3d1e; border:2px solid #3d200a; color:#f5edd8;
                font-family:inherit; letter-spacing:2px; border-radius:3px; cursor:pointer; text-transform:uppercase; font-size:0.9rem">
         Start Game
       </button>
     </div>
 
+  </div><!-- /mode-overlay -->
+
   <!-- Game-over modal -->
-  <div id="modal-overlay">
+  <div id="modal-overlay" class="hidden">
     <div id="modal-box">
       <h2 id="modal-heading">GAME OVER</h2>
       <div id="modal-results" style="width:100%;margin-bottom:0.6rem"></div>
       <div class="final-score" id="modal-score">0</div>
-      <input id="modal-name" type="text" maxlength="20" placeholder="Enter your name" />
-      <br>
-      <button id="modal-save-btn">Save Score</button>
+      <button id="modal-save-btn">Play Again</button>
     </div>
   </div>
 
@@ -687,7 +652,7 @@
       for (let r = 1; r <= 3; r++)
         for (let c = 1; c <= 3; c++) {
           const pip = document.createElement('div');
-          pip.className = 'pip' + (PIP_LAYOUTS[value].some(([pr,pc]) => pr===r && pc===c) ? '' : ' hidden');
+          pip.className = 'pip' + (PIP_LAYOUTS[value].some(([pr,pc]) => pr===r && pc===c) ? '' : ' pip-off');
           die.appendChild(pip);
         }
       die.dataset.slot = '0'; // assigned at init
@@ -701,7 +666,7 @@
       let i = 0;
       for (let r = 1; r <= 3; r++)
         for (let c = 1; c <= 3; c++) {
-          pips[i++].className = 'pip' + (PIP_LAYOUTS[value].some(([pr,pc]) => pr===r && pc===c) ? '' : ' hidden');
+          pips[i++].className = 'pip' + (PIP_LAYOUTS[value].some(([pr,pc]) => pr===r && pc===c) ? '' : ' pip-off');
         }
     }
 
@@ -976,7 +941,7 @@
         const bonus = subtotal >= 63 ? 35 : 0;
         cell.textContent = bonus > 0 ? '+35' : '0';
         cell.classList.add(bonus > 0 ? 'filled' : 'scratched');
-        if (prog) prog.style.display = 'none';
+        if (prog) prog.classList.add('hidden');
       } else {
         cell.textContent = '—';
       }
@@ -1092,11 +1057,10 @@
 
     function showGameOver(multiTotals, multiNames) {
       let myScore;
-      if (multiTotals && multiNames) {
-        // Read totals from scorecard cells (includes upper bonus + yahtzee bonus)
+      if (multiNames && multiNames.length > 0) {
         const totals = multiNames.map((name, i) => {
           const cell = document.getElementById(`sc-p${i}-total`);
-          return { name, total: cell ? (parseInt(cell.textContent) || 0) : (multiTotals[i] || 0) };
+          return { name, index: i, total: cell ? (parseInt(cell.textContent) || 0) : (multiTotals ? multiTotals[i] || 0 : 0) };
         });
         const max = Math.max(...totals.map(t => t.total));
         const winners = totals.filter(t => t.total === max);
@@ -1108,7 +1072,7 @@
             color:${t.total===max?'#8b2020':'#2a1a08'};font-weight:${t.total===max?'bold':'normal'}">
             <span>${t.name}${t.total===max?' ★':''}</span><span>${t.total}</span></div>`)
           .join('');
-        myScore = totals.find(t => t.name === multiNames[multiYourIndex])?.total || 0;
+        myScore = totals.find(t => t.index === multiYourIndex)?.total || 0;
         document.getElementById('modal-name').value = multiNames[multiYourIndex] || '';
       } else {
         document.getElementById('modal-heading').textContent = 'GAME OVER';
@@ -1117,39 +1081,26 @@
         document.getElementById('modal-name').value = '';
       }
       document.getElementById('modal-score').textContent = myScore;
-      document.getElementById('modal-overlay').classList.add('show');
-      setTimeout(() => document.getElementById('modal-name').focus(), 50);
+      document.getElementById('modal-overlay').classList.remove('hidden');
     }
 
-    document.getElementById('modal-save-btn').addEventListener('click', () => {
-      const name  = document.getElementById('modal-name').value;
-      const score = parseInt(document.getElementById('modal-score').textContent) || 0;
-      saveHighscore(name, score);
-      renderHighscores();
-      document.getElementById('highscore-panel').style.display = '';
-      document.getElementById('modal-overlay').classList.remove('show');
-    });
-
-    document.getElementById('modal-name').addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('modal-save-btn').click();
-    });
+    document.getElementById('modal-save-btn').addEventListener('click', () => location.reload());
 
     // ── mode select ───────────────────────────────────────────────
     function startGame(mode, msg) {
       gameMode = mode;
-      document.getElementById('mode-overlay').style.display = 'none';
-      document.getElementById('multi-entry').style.display = 'none';
+      document.getElementById('mode-overlay').classList.add('hidden');
+      document.getElementById('multi-entry').classList.add('hidden');
       
       if (mode === 'solo') {
-        document.getElementById('computer-row').style.display = 'none';
-        document.getElementById('turn-bar').style.display = 'none';
-        // hide CPU scorecard column
+        document.getElementById('computer-row').classList.add('hidden');
+        document.getElementById('turn-bar').classList.add('hidden');
         document.querySelectorAll('.score-row').forEach(row => {
           row.style.gridTemplateColumns = '2fr 1fr';
           const cpuCell = row.querySelector('.score-cell:first-child');
-          if (cpuCell) cpuCell.style.display = 'none';
+          if (cpuCell) cpuCell.classList.add('hidden');
         });
-        document.querySelector('.score-header-cell.cpu').style.display = 'none';
+        document.querySelector('.score-header-cell.cpu').classList.add('hidden');
       } else if (mode === 'multiplayer' && msg) {
         console.log('[multi] game_start', msg);
         multiRoomId = msg.roomId;
@@ -1173,18 +1124,18 @@
         updateTurnBar(multiCurrentTurn);
         updateHud();
 
-        document.getElementById('computer-row').style.display = '';
+        document.getElementById('computer-row').classList.remove('hidden');
         document.getElementById('computer-row').textContent = msg.players.filter((_,i) => i !== multiYourIndex).join(', ');
-        document.getElementById('turn-bar').style.display = '';
-        document.getElementById('lobby-screen').style.display = 'none';
+        document.getElementById('turn-bar').classList.remove('hidden');
+        document.getElementById('lobby-screen').classList.add('hidden');
       }
     }
 
     document.getElementById('mode-solo').addEventListener('click', () => startGame('solo'));
     document.getElementById('mode-cpu').addEventListener('click',  () => startGame('vs-cpu'));
     document.getElementById('mode-multi').addEventListener('click', () => {
-      document.querySelector('.mode-cards').style.display = 'none';
-      document.getElementById('multi-entry').style.display = 'flex';
+      document.querySelector('.mode-cards').classList.add('hidden');
+      document.getElementById('multi-entry').classList.remove('hidden');
       connectMultiplayer();
     });
     
@@ -1276,8 +1227,8 @@
         if (msg.type === 'player_joined') {
           multiYourIndex = msg.yourIndex;
           const code = new URLSearchParams(window.location.search).get('code') || '';
-          document.getElementById('multi-entry').style.display = 'none';
-          document.getElementById('lobby-screen').style.display = 'flex';
+          document.getElementById('multi-entry').classList.add('hidden');
+          document.getElementById('lobby-screen').classList.remove('hidden');
           document.getElementById('lobby-code-display').textContent = `Room: ${code}`;
 
           const list = document.getElementById('lobby-player-list');
@@ -1289,7 +1240,7 @@
 
           const isHost = msg.yourIndex === 0;
           const canStart = isHost && msg.players.length >= 2;
-          document.getElementById('start-game-btn').style.display = isHost ? '' : 'none';
+          document.getElementById('start-game-btn').classList.toggle('hidden', !isHost);
           document.getElementById('start-game-btn').disabled = !canStart;
           document.getElementById('lobby-hint').textContent = isHost
             ? (canStart ? 'Ready! Start whenever.' : `Waiting for players… (${msg.players.length}/6)`)
@@ -1339,6 +1290,14 @@
           tiltDice();
           updateTurnBar(multiCurrentTurn);
           updateHud();
+
+          // Client-side game-over fallback in case the server message is missed
+          const allFilled = multiPlayers.length > 0 &&
+            multiPlayers.every(p => CATS.every(c => p.scores[c] !== null && p.scores[c] !== undefined));
+          if (allFilled) {
+            console.log('[multi] all categories filled locally, triggering game over');
+            showGameOver(null, multiPlayers.map(p => p.name));
+          }
         }
 
         if (msg.type === 'game_over') {
@@ -1369,12 +1328,10 @@
     const roomCodeParam = urlParams.get('code');
     if (roomCodeParam || urlParams.has('new')) {
       if (roomCodeParam) document.getElementById('multi-code').value = roomCodeParam.toUpperCase();
-      document.querySelector('.mode-cards').style.display = 'none';
-      document.getElementById('multi-entry').style.display = 'flex';
+      document.querySelector('.mode-cards').classList.add('hidden');
+      document.getElementById('multi-entry').classList.remove('hidden');
       connectMultiplayer();
     }
-
-    renderHighscores();
 
     // ── CPU AI ────────────────────────────────────────────────────
     function cpuRollDice(vals) {

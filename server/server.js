@@ -185,7 +185,10 @@ wss.on('connection', ws => {
         const room = rooms.get(ws.roomId);
         if (!room) return;
         const pi = room.players.findIndex(p => p.id === id);
-        if (pi !== room.turn) return;
+        if (pi !== room.turn) {
+          console.log(`[score] REJECTED player ${id} pi=${pi} turn=${room.turn}`);
+          return;
+        }
 
         const player = room.players[pi];
         const { category, score } = msg;
