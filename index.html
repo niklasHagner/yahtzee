@@ -99,37 +99,57 @@
     /* invisible spacer that holds the slot when a die is kept */
     .die-placeholder { width: clamp(44px, 9vw, 68px); aspect-ratio: 1; flex-shrink: 0; }
 
-    /* ── dice ── */
+    /* ── 3D dice ── */
     .die {
-      width: clamp(44px, 9vw, 68px);
-      aspect-ratio: 1;
+      --ds: clamp(44px, 9vw, 68px);
+      --dh: clamp(22px, 4.5vw, 34px);
+      width: var(--ds); aspect-ratio: 1;
+      position: relative;
+      cursor: pointer;
+      perspective: calc(var(--ds) * 6);
+      flex-shrink: 0;
+      transition: transform 0.15s, filter 0.15s;
+      filter: drop-shadow(2px 4px 8px rgba(0,0,0,0.32));
+    }
+    .die:hover { transform: translateY(-5px) rotate(-2deg); filter: drop-shadow(3px 8px 14px rgba(0,0,0,0.42)); }
+    .die.locked { pointer-events: none; opacity: 0.45; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15)) grayscale(0.4) sepia(0.2); }
+
+    .die-inner {
+      width: 100%; height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+    }
+    .die-inner.rolling { animation: tumble 0.65s cubic-bezier(0.4,0,0.2,1); pointer-events: none; }
+
+    .die-face {
+      position: absolute; width: 100%; height: 100%;
       background: #f5edd8;
-      border-radius: 6px;
       border: 1.5px solid #5c3d1e;
-      box-shadow: 2px 3px 0 #5c3d1e66, 0 4px 10px rgba(0,0,0,0.25);
+      border-radius: 6px;
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       grid-template-rows: 1fr 1fr 1fr;
       padding: clamp(4px, 1vw, 8px);
       gap: 2px;
-      cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
-      position: relative;
+      box-sizing: border-box;
+      backface-visibility: hidden;
     }
-    .die:hover { transform: translateY(-4px) rotate(-3deg); box-shadow: 3px 6px 0 #5c3d1e88, 0 8px 16px rgba(0,0,0,0.3); }
+    .die-face.face-front  { transform: translateZ(var(--dh)); }
+    .die-face.face-back   { transform: rotateY(180deg)  translateZ(var(--dh)); }
+    .die-face.face-top    { transform: rotateX(-90deg)  translateZ(var(--dh)); }
+    .die-face.face-bottom { transform: rotateX(90deg)   translateZ(var(--dh)); }
+    .die-face.face-right  { transform: rotateY(90deg)   translateZ(var(--dh)); }
+    .die-face.face-left   { transform: rotateY(-90deg)  translateZ(var(--dh)); }
 
     @keyframes tumble {
-      0%   { transform: rotate(0deg)   translateY(0);    }
-      20%  { transform: rotate(-18deg) translateY(-6px); }
-      40%  { transform: rotate(14deg)  translateY(-10px); }
-      60%  { transform: rotate(-10deg) translateY(-5px); }
-      80%  { transform: rotate(8deg)   translateY(-2px); }
-      100% { transform: rotate(0deg)   translateY(0);    }
+      0%   { transform: rotateX(0)      rotateY(0)      rotateZ(0); }
+      40%  { transform: rotateX(-200deg) rotateY(60deg)  rotateZ(15deg); }
+      70%  { transform: rotateX(-320deg) rotateY(-30deg) rotateZ(-10deg); }
+      100% { transform: rotateX(-360deg) rotateY(0)      rotateZ(0); }
     }
-    .die.rolling { animation: tumble 0.45s cubic-bezier(0.36,0.07,0.19,0.97); pointer-events: none; }
 
     .pip {
-      width: clamp(6px, 1.4vw, 10px); height: clamp(6px, 1.4vw, 10px);
+      width: min(22px, 55%); height: min(22px, 55%);
       background: #2a1a08;
       border-radius: 50%;
       box-shadow: inset 1px 1px 1px rgba(255,255,255,0.15);
@@ -644,30 +664,58 @@
     const playerKept = document.getElementById('player-kept');
 
     // ── dice rendering ──────────────────────────────────────────
+    // Cube face assignments: front=1, back=6, top=2, bottom=5, right=3, left=4
+    const FACE_DEFS = [
+      { cls: 'face-front',  val: 1 },
+      { cls: 'face-back',   val: 6 },
+      { cls: 'face-top',    val: 2 },
+      { cls: 'face-bottom', val: 5 },
+      { cls: 'face-right',  val: 3 },
+      { cls: 'face-left',   val: 4 },
+    ];
+    const DIE_ROTATION = {
+      1: 'rotateX(0deg)   rotateY(0deg)',
+      2: 'rotateX(90deg)  rotateY(0deg)',
+      3: 'rotateX(0deg)   rotateY(-90deg)',
+      4: 'rotateX(0deg)   rotateY(90deg)',
+      5: 'rotateX(-90deg) rotateY(0deg)',
+      6: 'rotateX(0deg)   rotateY(180deg)',
+    };
+
+    function makeFace(val) {
+      const face = document.createElement('div');
+      for (let r = 1; r <= 3; r++)
+        for (let c = 1; c <= 3; c++) {
+          const pip = document.createElement('div');
+          pip.className = 'pip' + (PIP_LAYOUTS[val].some(([pr,pc]) => pr===r && pc===c) ? '' : ' pip-off');
+          face.appendChild(pip);
+        }
+      return face;
+    }
+
     function makeDie(value) {
       const die = document.createElement('div');
       die.className = 'die';
       die.dataset.value = value;
       die.dataset.kept = 'false';
-      for (let r = 1; r <= 3; r++)
-        for (let c = 1; c <= 3; c++) {
-          const pip = document.createElement('div');
-          pip.className = 'pip' + (PIP_LAYOUTS[value].some(([pr,pc]) => pr===r && pc===c) ? '' : ' pip-off');
-          die.appendChild(pip);
-        }
-      die.dataset.slot = '0'; // assigned at init
+      const inner = document.createElement('div');
+      inner.className = 'die-inner';
+      FACE_DEFS.forEach(({ cls, val }) => {
+        const face = makeFace(val);
+        face.className = `die-face ${cls}`;
+        inner.appendChild(face);
+      });
+      inner.style.transform = DIE_ROTATION[value];
+      die.appendChild(inner);
+      die.dataset.slot = '0';
       die.addEventListener('click', () => toggleKeep(die));
       return die;
     }
 
     function updateDiePips(die, value) {
       die.dataset.value = value;
-      const pips = die.querySelectorAll('.pip');
-      let i = 0;
-      for (let r = 1; r <= 3; r++)
-        for (let c = 1; c <= 3; c++) {
-          pips[i++].className = 'pip' + (PIP_LAYOUTS[value].some(([pr,pc]) => pr===r && pc===c) ? '' : ' pip-off');
-        }
+      const inner = die.querySelector('.die-inner');
+      if (inner) inner.style.transform = DIE_ROTATION[value];
     }
 
     function toggleKeep(die) {
@@ -983,6 +1031,8 @@
       const hud  = document.getElementById('hud');
       if (rollsLeft === 3) {
         hud.innerHTML = '<strong>Roll!</strong>';
+      } else if (rollsLeft === 0) {
+        hud.innerHTML = '<strong>No more rolls!</strong> Pick a score.';
       } else {
         hud.innerHTML = `Click dice to keep them. You have <span id="rolls-left">${rollsLeft}</span>${rollsLeft === 1 ? ' roll remaining' : ' rolls remaining'}`;
       }
@@ -1007,10 +1057,14 @@
       let settled = 0;
       freeDice.forEach((die, i) => {
         setTimeout(() => {
-          die.classList.add('rolling');
-          die.addEventListener('animationend', () => {
-            die.classList.remove('rolling');
-            updateDiePips(die, Math.ceil(Math.random() * 6));
+          const inner = die.querySelector('.die-inner');
+          inner.classList.add('rolling');
+          inner.addEventListener('animationend', () => {
+            inner.classList.remove('rolling');
+            const value = Math.ceil(Math.random() * 6);
+            inner.style.transition = 'none';
+            updateDiePips(die, value);
+            requestAnimationFrame(() => { inner.style.transition = ''; });
             if (++settled === freeDice.length) {
               const allDice = getAllDice();
               if (allDice.length === 5) showAvailablePicks(allDice);
@@ -1402,10 +1456,13 @@
         // animate CPU dice briefly
         [...diceArea.querySelectorAll('.die')].forEach((die, i) => {
           if (!keeps[i]) {
-            die.classList.add('rolling');
-            die.addEventListener('animationend', () => {
-              die.classList.remove('rolling');
+            const inner = die.querySelector('.die-inner');
+            inner.classList.add('rolling');
+            inner.addEventListener('animationend', () => {
+              inner.classList.remove('rolling');
+              inner.style.transition = 'none';
               updateDiePips(die, dice[i]);
+              requestAnimationFrame(() => { inner.style.transition = ''; });
             }, { once: true });
           }
         });
