@@ -208,6 +208,14 @@
       display: flex; flex-direction: column; align-items: center;
       gap: 0.8rem; margin-top: 0.5rem;
     }
+    .multi-field {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.25rem;
+    }
+    .multi-field label {
+      color: #5c3d1e; font-size: 0.58rem; font-weight: bold;
+      letter-spacing: 2px; text-transform: uppercase;
+    }
     #lobby-screen {
       display: flex; flex-direction: column; align-items: center;
       gap: 0.9rem; margin-top: 0.5rem; width: 100%; max-width: 360px;
@@ -575,15 +583,21 @@
     </div>
     <!-- name entry + room selection shown when multiplayer is chosen -->
     <div id="multi-entry" class="hidden">
-      <input id="multi-name" type="text" maxlength="20" placeholder="Your name"
-        style="width:220px; text-align:center; font-size:1.1rem; letter-spacing:2px; text-transform:uppercase;
-               background:#f5edd8; border:2px solid #5c3d1e; border-radius:3px; padding:0.4rem; color:#2a1a08;
-               font-family:inherit; outline:none">
+      <div class="multi-field">
+        <label for="multi-name">Username</label>
+        <input id="multi-name" type="text" maxlength="20" placeholder="USERNAME"
+          style="width:220px; text-align:center; font-size:1.1rem; letter-spacing:2px; text-transform:uppercase;
+                 background:#f5edd8; border:2px solid #5c3d1e; border-radius:3px; padding:0.4rem; color:#2a1a08;
+                 font-family:inherit; outline:none">
+      </div>
       
-      <input id="multi-code" type="text" maxlength="6" placeholder="ROOM CODE"
-        style="width:240px; text-align:center; font-size:1.4rem; letter-spacing:4px; text-transform:uppercase;
-               background:#f5edd8; border:2px solid #5c3d1e; border-radius:3px; padding:0.4rem; color:#2a1a08;
-               font-family:inherit; outline:none">
+      <div class="multi-field">
+        <label for="multi-code">Room code</label>
+        <input id="multi-code" type="text" maxlength="6" placeholder="ROOM CODE"
+          style="width:240px; text-align:center; font-size:1.4rem; letter-spacing:4px; text-transform:uppercase;
+                 background:#f5edd8; border:2px solid #5c3d1e; border-radius:3px; padding:0.4rem; color:#2a1a08;
+                 font-family:inherit; outline:none">
+      </div>
       
       <div style="display:flex; gap:0.8rem; flex-wrap:wrap; justify-content:center">
         <button id="multi-create-btn"
