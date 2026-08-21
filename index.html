@@ -1249,7 +1249,7 @@
     document.getElementById('multi-name').value = randomAnimalName();
 
     // ── multiplayer WebSocket with reconnect ──────────────────────
-    const WS_URL = 'ws://localhost:3008'; // change to wss://your-deployed-url for production
+    const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
     let multiWs = null;
     let multiReconnectAttempt = 0;
     let multiReconnectWaitedSeconds = 0;
