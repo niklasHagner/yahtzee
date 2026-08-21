@@ -600,7 +600,7 @@
         </button>
       </div>
       
-      <div id="multi-status" style="color:#f5edd8; font-size:0.85rem; font-style:italic; min-height:1.2em"></div>
+      <div id="multi-status" style="color:#3d200a; font-size:0.85rem; font-style:italic; font-weight:bold; min-height:1.2em"></div>
     </div>
 
     <!-- Lobby waiting screen (shown after joining a room) -->
@@ -1238,6 +1238,9 @@
     const WS_URL = 'ws://localhost:3008'; // change to wss://your-deployed-url for production
     let multiWs = null;
     let multiReconnectAttempt = 0;
+    let multiReconnectWaitedSeconds = 0;
+    let multiReconnectTimer = null;
+    let multiReconnectTimeout = null;
     const MAX_RECONNECT_ATTEMPTS = 12;
 
     document.getElementById('start-game-btn').addEventListener('click', () => {
@@ -1251,14 +1254,28 @@
       document.getElementById('multi-status').textContent = msg;
     }
 
+    function clearReconnectWait() {
+      if (multiReconnectTimer) clearInterval(multiReconnectTimer);
+      if (multiReconnectTimeout) clearTimeout(multiReconnectTimeout);
+      multiReconnectTimer = null;
+      multiReconnectTimeout = null;
+    }
+
+    function setReconnectWaitStatus(waitedSeconds) {
+      const secondsLabel = waitedSeconds === 1 ? '1 second' : `${waitedSeconds} seconds`;
+      setMultiStatus(`Server may be waking up. Waiting for ${secondsLabel} ${'⌛'.repeat(waitedSeconds)}`);
+    }
+
     function connectMultiplayer() {
       setMultiStatus(multiReconnectAttempt === 0
         ? 'Connecting to server…'
-        : `Server may be waking up — retrying (${multiReconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})…`);
+        : 'Trying server again…');
       try { multiWs = new WebSocket(WS_URL); } catch { scheduleReconnect(); return; }
 
       multiWs.onopen = () => {
+        clearReconnectWait();
         multiReconnectAttempt = 0;
+        multiReconnectWaitedSeconds = 0;
         console.log('[ws] connected');
         setMultiStatus('Connected. Enter your name and join.');
         // Auto-create room if ?new param is present
@@ -1373,8 +1390,17 @@
       }
       multiReconnectAttempt++;
       const delay = Math.min(1000 * 2 ** (multiReconnectAttempt - 1), 10_000);
-      setMultiStatus(`Server may be waking up — retrying in ${Math.round(delay/1000)}s (${multiReconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})…`);
-      setTimeout(connectMultiplayer, delay);
+      const delaySeconds = Math.round(delay / 1000);
+      clearReconnectWait();
+      setMultiStatus('Server may be waking up. Waiting…');
+      multiReconnectTimer = setInterval(() => {
+        multiReconnectWaitedSeconds++;
+        setReconnectWaitStatus(multiReconnectWaitedSeconds);
+      }, 1000);
+      multiReconnectTimeout = setTimeout(() => {
+        clearReconnectWait();
+        connectMultiplayer();
+      }, delay);
     }
 
     // Check URL for room code or ?new — auto-open multiplayer lobby if present (must be after WS declarations)
