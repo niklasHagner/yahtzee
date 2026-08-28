@@ -41,12 +41,12 @@ const rooms = new Map();
 let nextId = 1;
 
 function send(ws, msg) {
-  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
 function broadcast(room, msg, excludeId = null) {
   room.players.forEach(p => {
-    if (p.id !== excludeId) send(p.ws, msg);
+    if (p.id !== excludeId && !p.disconnected) send(p.ws, msg);
   });
 }
 
@@ -216,7 +216,44 @@ wss.on('connection', ws => {
           const totals = room.players.map(p => Object.values(p.scores).reduce((a,b) => a+b, 0));
           broadcast(room, { type: 'game_over', totals, names: room.players.map(p => p.name) });
           rooms.delete(room.id);
+          if (ws.code) roomCodes.delete(ws.code);
         }
+        break;
+      }
+
+      case 'rejoin': {
+        const code = msg.code ? msg.code.toUpperCase() : null;
+        const name = (msg.name || '').toUpperCase().trim();
+        if (!code || !name) { send(ws, { type: 'error', message: 'Invalid rejoin data.' }); return; }
+
+        const roomId = `room_${code}`;
+        const room = rooms.get(roomId);
+        if (!room) { send(ws, { type: 'error', message: 'No active game found.' }); return; }
+
+        const pi = room.players.findIndex(p => p.name === name && p.disconnected);
+        if (pi === -1) { send(ws, { type: 'error', message: 'Player not found or not disconnected.' }); return; }
+
+        room.players[pi].ws = ws;
+        room.players[pi].disconnected = false;
+        room.players[pi].id = id;
+        ws.roomId = roomId;
+        ws.code = code;
+        ws.playerName = name;
+
+        send(ws, {
+          type: 'rejoin_success',
+          roomId,
+          yourIndex: pi,
+          players: room.players.map(p => p.name),
+          allScores: room.players.map(p => ({ scores: { ...p.scores }, yahtzeeBonus: p.yahtzeeBonus || 0 })),
+          dice: room.dice,
+          rollsLeft: room.rollsLeft,
+          keptMask: room.keptMask,
+          turn: room.turn,
+        });
+
+        broadcast(room, { type: 'player_reconnected', playerIndex: pi, name }, id);
+        console.log(`[rejoin] player ${id} (${name}) rejoined room ${roomId}`);
         break;
       }
     }
@@ -243,8 +280,22 @@ wss.on('connection', ws => {
     }
     const room = rooms.get(ws.roomId);
     if (room) {
-      broadcast(room, { type: 'opponent_disconnected' }, id);
-      rooms.delete(ws.roomId);
+      const pi = room.players.findIndex(p => p.id === id);
+      if (pi !== -1) {
+        room.players[pi].ws = null;
+        room.players[pi].disconnected = true;
+        broadcast(room, { type: 'player_disconnected', playerIndex: pi, name: room.players[pi].name });
+      }
+      const allGone = room.players.every(p => p.disconnected);
+      if (allGone) {
+        setTimeout(() => {
+          if (room.players.every(p => p.disconnected)) {
+            rooms.delete(room.id);
+            if (ws.code) roomCodes.delete(ws.code);
+            console.log(`[cleanup] room ${room.id} deleted - all players gone`);
+          }
+        }, 5 * 60_000);
+      }
     }
   });
 });

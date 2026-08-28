@@ -304,7 +304,7 @@
       text-transform: uppercase;
       background: #e0d0a0;
     }
-    .score-header-cell { text-align: center; color: #b0a080; }
+    .score-header-cell { text-align: center; color: #b0a080; font-size: 0.55rem; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .score-header-cell.you  { color: #5c1a8b; }
     .score-header-cell.cpu  { color: #1a5c8b; }
 
@@ -337,8 +337,8 @@
     .score-row.total-row { background: #d4c090; border-top: 1.5px solid #5c3d1e44; }
 
     .score-cell {
-      padding: 0.45rem 1rem; text-align: center;
-      font-size: 0.9rem; color: #9a8060; min-width: 60px;
+      padding: 0.45rem 0.5rem; text-align: center;
+      font-size: 0.9rem; color: #9a8060; min-width: 40px;
     }
     .score-cell.filled   { color: #2a1a08; font-weight: bold; }
     .score-cell.scratched { color: #c0b090; text-decoration: line-through; }
@@ -668,6 +668,15 @@
     let multiCurrentTurn = 0;
     let multiPlayers = []; // [{name, scores, yahtzeeBonus}] for all players in game
     let dice = [];
+    let pendingRejoin = null;
+
+    function saveSession() {
+      const code = multiRoomId ? multiRoomId.replace('room_', '') : '';
+      const name = multiPlayers[multiYourIndex]?.name || '';
+      if (!code || !name) return;
+      localStorage.setItem('yahtzee_session', JSON.stringify({ code, name }));
+    }
+    function clearSession() { localStorage.removeItem('yahtzee_session'); }
 
     // Returns the scorecard cell ID for the current player's category
     function myCellId(cat) {
@@ -843,8 +852,13 @@
 
     function renderDice() {
       if (gameMode === 'multiplayer' && dice.length === 5) {
-        // Map by original slot index so kept dice don't shift other values
-        [...diceArea.querySelectorAll('.die'), ...playerKept.querySelectorAll('.die')].forEach(d => {
+        const opponentKept = document.getElementById('opponent-kept');
+        const allDice = [
+          ...diceArea.querySelectorAll('.die'),
+          ...playerKept.querySelectorAll('.die'),
+          ...(opponentKept ? opponentKept.querySelectorAll('.die') : []),
+        ];
+        allDice.forEach(d => {
           const slot = +d.dataset.slot;
           if (slot >= 0 && slot < dice.length) updateDiePips(d, dice[slot]);
         });
@@ -922,7 +936,9 @@
         });
         html += `</div>`;
       });
-      document.getElementById('scorecard').innerHTML = html;
+      const scorecardEl = document.getElementById('scorecard');
+      scorecardEl.innerHTML = html;
+      scorecardEl.style.width = n > 2 ? `${Math.max(280, 100 + n * 55)}px` : '';
     }
 
     function updateTurnBar(turn) {
@@ -930,10 +946,19 @@
       const isMyTurn = turn === multiYourIndex;
       document.getElementById('turn-bar').className = isMyTurn ? 'player-turn' : 'computer-turn';
       document.getElementById('roll-btn').disabled = !isMyTurn || rollsLeft === 0;
-      if (!isMyTurn) clearAvailablePicks();
-      // Show whoever's turn it is in the opponent row
+      if (!isMyTurn) {
+        clearAvailablePicks();
+        diceArea.querySelectorAll('.die').forEach(d => {
+          d.classList.add('locked');
+          d.style.pointerEvents = 'none';
+        });
+      } else {
+        diceArea.querySelectorAll('.die').forEach(d => d.style.pointerEvents = '');
+      }
       const activeName = multiPlayers[turn] ? multiPlayers[turn].name : '';
-      document.getElementById('computer-row').textContent = isMyTurn ? '' : `${activeName}'s turn`;
+      const nameEl = document.getElementById('opponent-turn-name');
+      if (nameEl) nameEl.textContent = isMyTurn ? '' : `${activeName}'s turn`;
+      document.getElementById('computer-row').classList.toggle('hidden', isMyTurn);
     }
 
     function refreshScores() {
@@ -1041,8 +1066,20 @@
 
     // ── HUD ──────────────────────────────────────────────────────
     function updateHud() {
-      const span = document.getElementById('rolls-left');
       const hud  = document.getElementById('hud');
+
+      if (gameMode === 'multiplayer' && multiCurrentTurn !== multiYourIndex) {
+        const activeName = multiPlayers[multiCurrentTurn] ? multiPlayers[multiCurrentTurn].name : 'Opponent';
+        if (rollsLeft === 3) {
+          hud.innerHTML = `<em>${activeName} is about to roll\u2026</em>`;
+        } else if (rollsLeft === 0) {
+          hud.innerHTML = `<em>${activeName} has no more rolls \u2014 picking a score\u2026</em>`;
+        } else {
+          hud.innerHTML = `<em>${activeName} is playing\u2026 (${rollsLeft} roll${rollsLeft === 1 ? '' : 's'} left)</em>`;
+        }
+        return;
+      }
+
       if (rollsLeft === 3) {
         hud.innerHTML = '<strong>Roll!</strong>';
       } else if (rollsLeft === 0) {
@@ -1152,7 +1189,7 @@
       document.getElementById('modal-overlay').classList.remove('hidden');
     }
 
-    document.getElementById('modal-save-btn').addEventListener('click', () => location.reload());
+    document.getElementById('modal-save-btn').addEventListener('click', () => { clearSession(); location.reload(); });
 
     // ── mode select ───────────────────────────────────────────────
     function startGame(mode, msg) {
@@ -1192,10 +1229,12 @@
         updateTurnBar(multiCurrentTurn);
         updateHud();
 
-        document.getElementById('computer-row').classList.remove('hidden');
-        document.getElementById('computer-row').textContent = msg.players.filter((_,i) => i !== multiYourIndex).join(', ');
+        const compRow = document.getElementById('computer-row');
+        compRow.classList.remove('hidden');
+        compRow.innerHTML = '<div class="player-info"><div class="player-labels"><div class="player-name" id="opponent-turn-name"></div></div></div><div class="kept-zone" id="opponent-kept"></div>';
         document.getElementById('turn-bar').classList.remove('hidden');
         document.getElementById('lobby-screen').classList.add('hidden');
+        saveSession();
       }
     }
 
@@ -1291,10 +1330,15 @@
         multiReconnectAttempt = 0;
         multiReconnectWaitedSeconds = 0;
         console.log('[ws] connected');
-        setMultiStatus('Connected. Enter your name and join.');
-        // Auto-create room if ?new param is present
-        if (new URLSearchParams(window.location.search).has('new')) {
-          document.getElementById('multi-create-btn').click();
+        if (pendingRejoin) {
+          setMultiStatus('Reconnecting to game\u2026');
+          multiWs.send(JSON.stringify({ type: 'rejoin', code: pendingRejoin.code, name: pendingRejoin.name }));
+          pendingRejoin = null;
+        } else {
+          setMultiStatus('Connected. Enter your name and join.');
+          if (new URLSearchParams(window.location.search).has('new')) {
+            document.getElementById('multi-create-btn').click();
+          }
         }
       };
 
@@ -1348,12 +1392,36 @@
         if (msg.type === 'dice_rolled') {
           dice = msg.dice;
           rollsLeft = msg.rollsLeft;
-          // Unlock dice so they can be kept
-          diceArea.querySelectorAll('.die').forEach(d => d.classList.remove('unrolled', 'locked'));
+          const isMyRoll = msg.rolledBy === multiYourIndex;
+          diceArea.querySelectorAll('.die').forEach(d => d.classList.remove('unrolled'));
+          if (isMyRoll) {
+            diceArea.querySelectorAll('.die').forEach(d => d.classList.remove('locked'));
+          } else {
+            playRollSound();
+          }
           renderDice();
           updateHud();
           updateTurnBar(multiCurrentTurn);
-          if (msg.rolledBy === multiYourIndex) showAvailablePicks(dice);
+          if (isMyRoll) showAvailablePicks(dice);
+        }
+
+        if (msg.type === 'keep_update') {
+          if (multiCurrentTurn === multiYourIndex) return;
+          const opponentKept = document.getElementById('opponent-kept');
+          if (!opponentKept) return;
+          const allDice = [...diceArea.querySelectorAll('.die'), ...opponentKept.querySelectorAll('.die')];
+          const dieEl = allDice.find(d => +d.dataset.slot === msg.index);
+          if (!dieEl) return;
+          playPickSound();
+          if (msg.kept) {
+            const ph = document.createElement('div');
+            ph.className = 'die-placeholder';
+            ph.dataset.slot = dieEl.dataset.slot;
+            flipMove(dieEl, () => { diceArea.insertBefore(ph, dieEl); opponentKept.appendChild(dieEl); });
+          } else {
+            const ph = diceArea.querySelector(`.die-placeholder[data-slot="${msg.index}"]`);
+            flipMove(dieEl, () => { diceArea.insertBefore(dieEl, ph || null); if (ph) ph.remove(); });
+          }
         }
 
         if (msg.type === 'score_committed') {
@@ -1362,7 +1430,7 @@
             updatePlayerCell(msg.byIndex, msg.category, msg.score);
             updatePlayerTotal(msg.byIndex);
           }
-          [...playerKept.querySelectorAll('.die')].forEach(d => {
+          [...playerKept.querySelectorAll('.die'), ...(document.getElementById('opponent-kept')?.querySelectorAll('.die') || [])].forEach(d => {
             d.dataset.kept = 'false';
             const ph = diceArea.querySelector(`.die-placeholder[data-slot="${d.dataset.slot}"]`);
             if (ph) { diceArea.insertBefore(d, ph); ph.remove(); }
@@ -1386,10 +1454,80 @@
         }
 
         if (msg.type === 'game_over') {
+          clearSession();
           showGameOver(msg.totals, msg.names);
+        }
+        if (msg.type === 'player_disconnected') {
+          const dname = msg.name || 'A player';
+          document.getElementById('hud').innerHTML = `<em>${dname} disconnected \u2014 waiting for reconnection\u2026</em>`;
+        }
+        if (msg.type === 'player_reconnected') {
+          const rname = msg.name || 'Player';
+          document.getElementById('hud').innerHTML = `<em>${rname} reconnected!</em>`;
+          setTimeout(updateHud, 2000);
         }
         if (msg.type === 'opponent_disconnected') {
           setMultiStatus('A player disconnected.');
+        }
+
+        if (msg.type === 'rejoin_success') {
+          startGame('multiplayer', {
+            roomId: msg.roomId,
+            yourIndex: msg.yourIndex,
+            players: msg.players,
+            dice: msg.dice,
+            rollsLeft: msg.rollsLeft,
+            turn: msg.turn,
+          });
+          msg.allScores.forEach((pd, i) => {
+            CATS.forEach(cat => {
+              if (pd.scores[cat] !== undefined) {
+                multiPlayers[i].scores[cat] = pd.scores[cat];
+                updatePlayerCell(i, cat, pd.scores[cat]);
+                if (i === msg.yourIndex) playerScores[cat] = pd.scores[cat];
+              }
+            });
+            multiPlayers[i].yahtzeeBonus = pd.yahtzeeBonus || 0;
+            updatePlayerTotal(i);
+          });
+          if (msg.turn === msg.yourIndex) {
+            msg.keptMask.forEach((kept, i) => {
+              if (kept) {
+                const dieEl = [...diceArea.querySelectorAll('.die')].find(d => +d.dataset.slot === i);
+                if (dieEl) {
+                  dieEl.dataset.kept = 'true';
+                  const ph = document.createElement('div');
+                  ph.className = 'die-placeholder';
+                  ph.dataset.slot = String(i);
+                  diceArea.insertBefore(ph, dieEl);
+                  playerKept.appendChild(dieEl);
+                }
+              }
+            });
+            if (rollsLeft < 3) {
+              diceArea.querySelectorAll('.die').forEach(d => d.classList.remove('unrolled', 'locked'));
+              showAvailablePicks(dice);
+            }
+          } else {
+            const opponentKept = document.getElementById('opponent-kept');
+            if (opponentKept) {
+              msg.keptMask.forEach((kept, i) => {
+                if (kept) {
+                  const dieEl = [...diceArea.querySelectorAll('.die')].find(d => +d.dataset.slot === i);
+                  if (dieEl) {
+                    const ph = document.createElement('div');
+                    ph.className = 'die-placeholder';
+                    ph.dataset.slot = String(i);
+                    diceArea.insertBefore(ph, dieEl);
+                    opponentKept.appendChild(dieEl);
+                  }
+                }
+              });
+            }
+          }
+          refreshUpperBonus();
+          refreshTotal();
+          saveSession();
         }
       };
 
@@ -1425,6 +1563,18 @@
       document.querySelector('.mode-cards').classList.add('hidden');
       document.getElementById('multi-entry').classList.remove('hidden');
       connectMultiplayer();
+    } else {
+      try {
+        const saved = JSON.parse(localStorage.getItem('yahtzee_session'));
+        if (saved && saved.code && saved.name) {
+          pendingRejoin = saved;
+          document.querySelector('.mode-cards').classList.add('hidden');
+          document.getElementById('multi-entry').classList.remove('hidden');
+          document.getElementById('multi-name').value = saved.name;
+          document.getElementById('multi-code').value = saved.code;
+          connectMultiplayer();
+        }
+      } catch {}
     }
 
     // ── CPU AI ────────────────────────────────────────────────────
