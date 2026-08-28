@@ -916,7 +916,7 @@
       html += `<div class="score-header" style="grid-template-columns:${cols}"><div class="score-header-cell"></div>`;
       playerNames.forEach((name, i) => {
         const cls = i === myIndex ? 'you' : 'cpu';
-        const label = i === myIndex ? 'You' : name.split(' ')[0]; // first word only if long
+        const label = i === myIndex ? `You (${name})` : name.split(' ')[0];
         html += `<div class="score-header-cell ${cls}" title="${name}">${label}</div>`;
       });
       html += `</div><div class="score-section-divider"></div>`;
