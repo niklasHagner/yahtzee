@@ -193,6 +193,7 @@
     .score-cell.available:hover { background: #bfddac; }
     .score-cell.scratch-available { color: #8b5a1a; cursor: pointer; background: #e8d8a0; }
     .score-cell.scratch-available:hover { background: #d9c880; }
+    .score-cell.preview { color: #c0b090; cursor: default; background: none; font-style: italic; }
     .score-cell.filled   { color: #2a1a08; font-weight: bold; }
     .score-cell.scratched { color: #b0a080; text-decoration: line-through; }
 
@@ -833,7 +834,7 @@
         if (!cell) return;
         const score = calcScore(cat, dice);
         cell.textContent = score;
-        cell.classList.remove('available','scratch-available');
+        cell.classList.remove('available','scratch-available','preview');
         cell.classList.add(score > 0 ? 'available' : 'scratch-available');
         cell.onclick = () => commitScore(cat, score);
       });
@@ -845,7 +846,20 @@
         const cell = document.getElementById(myCellId(cat));
         if (!cell) return;
         cell.textContent = '—';
-        cell.classList.remove('available','scratch-available');
+        cell.classList.remove('available','scratch-available','preview');
+        cell.onclick = null;
+      });
+    }
+
+    function showPreviewPicks(dice) {
+      CATS.forEach(cat => {
+        if (playerScores[cat] !== null) return;
+        const cell = document.getElementById(myCellId(cat));
+        if (!cell) return;
+        const score = calcScore(cat, dice);
+        cell.textContent = score;
+        cell.classList.remove('available','scratch-available','preview');
+        cell.classList.add('preview');
         cell.onclick = null;
       });
     }
@@ -916,8 +930,7 @@
       html += `<div class="score-header" style="grid-template-columns:${cols}"><div class="score-header-cell"></div>`;
       playerNames.forEach((name, i) => {
         const cls = i === myIndex ? 'you' : 'cpu';
-        const label = i === myIndex ? `You (${name})` : name.split(' ')[0];
-        html += `<div class="score-header-cell ${cls}" title="${name}">${label}</div>`;
+        html += `<div class="score-header-cell ${cls}" id="sc-header-p${i}" title="${name}">${name.split(' ')[0]}</div>`;
       });
       html += `</div><div class="score-section-divider"></div>`;
       // Score rows
@@ -945,7 +958,13 @@
       if (gameMode !== 'multiplayer') return;
       const isMyTurn = turn === multiYourIndex;
       document.getElementById('turn-bar').className = isMyTurn ? 'player-turn' : 'computer-turn';
-      document.getElementById('roll-btn').disabled = !isMyTurn || rollsLeft === 0;
+      const rollBtn = document.getElementById('roll-btn');
+      if (isMyTurn) {
+        rollBtn.classList.remove('hidden');
+        rollBtn.disabled = rollsLeft === 0;
+      } else {
+        rollBtn.classList.add('hidden');
+      }
       if (!isMyTurn) {
         clearAvailablePicks();
         diceArea.querySelectorAll('.die').forEach(d => {
@@ -959,6 +978,10 @@
       const nameEl = document.getElementById('opponent-turn-name');
       if (nameEl) nameEl.textContent = isMyTurn ? '' : `${activeName}'s turn`;
       document.getElementById('computer-row').classList.toggle('hidden', isMyTurn);
+      multiPlayers.forEach((_, i) => {
+        const hdr = document.getElementById(`sc-header-p${i}`);
+        if (hdr) hdr.style.fontWeight = i === turn ? 'bold' : '';
+      });
     }
 
     function refreshScores() {
@@ -1220,6 +1243,9 @@
         Object.keys(playerScores).forEach(k => { playerScores[k] = null; });
         multiPlayers[multiYourIndex].scores = playerScores;
 
+        const playerNameEl = document.querySelector('#player-row .player-name');
+        if (playerNameEl) playerNameEl.textContent = `You (${msg.players[multiYourIndex]})`;
+
         buildMultiplayerScorecard(msg.players, multiYourIndex);
 
         dice = msg.dice;
@@ -1403,6 +1429,7 @@
           updateHud();
           updateTurnBar(multiCurrentTurn);
           if (isMyRoll) showAvailablePicks(dice);
+          else showPreviewPicks(dice);
         }
 
         if (msg.type === 'keep_update') {
